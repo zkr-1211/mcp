@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.env
+.DS_Store
+coverage/
+*.tgz
+.tmp/
+src/
+dist/
+test-*.ts
+vite.config.ts
+tsconfig.json
+.gitignore

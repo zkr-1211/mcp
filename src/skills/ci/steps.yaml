@@ -1,0 +1,504 @@
+# CI 自动化工作流 - 执行步骤定义
+# 本文件定义了 CI skill 的标准执行流程,供 AI 严格遵循
+
+version: "1.0.0"
+name: "ci-deployment-steps"
+
+# ============================================
+# 全局约束（所有步骤必须遵守）
+# ============================================
+global_constraints:
+  - "必须完整阅读本文件所有内容后再执行"
+  - "必须严格按照步骤顺序执行,严禁跳过任何步骤"
+  - "仅执行本文件中定义的操作,严禁执行其他未指定的操作"
+  - "每一步完成后必须验证结果,确认成功后再进行下一步"
+  - "如遇错误必须立即停止执行并报告,严禁擅自绕过或忽略错误"
+  - "不要假设任何配置或状态,必须通过工具调用来确认"
+  - "多环境部署时必须按顺序逐个执行,严禁并行处理"
+
+# ============================================
+# 执行步骤
+# ============================================
+steps:
+  
+  # ----------------------------------------
+  # 步骤 0: 公共逻辑定义
+  # ----------------------------------------
+  - step: 0
+    name: "common_logic_definitions"
+    description: "定义可复用的公共逻辑"
+    sub_steps:
+      
+      # 0.1 分支存在性检查
+      - step: 0.1
+        name: "branch_existence_check"
+        description: "创建 MR 前检查目标分支是否存在"
+        tool: "mcp_gitlab_browse_refs"
+        params:
+          action: "get_branch"
+          project_id: "{project_id}"
+          branch: "{目标分支}"
+        conditions:
+          - condition: "返回 404 或分支不存在"
+            action: "立即停止执行"
+            error_message: |
+              ❌ 目标分支不存在: {目标分支}
+              请先创建分支 {目标分支} 后重试
+          
+          - condition: "分支存在"
+            action: "继续执行"
+      
+      # 0.2 MR 状态检查
+      - step: 0.2
+        name: "mr_status_check"
+        description: "检查 MR 状态和合并可行性"
+        methods:
+          - method: "A - 已知 IID 时(推荐)"
+            tool: "mcp_gitlab_manage_merge_request"
+            params:
+              action: "update"
+              project_id: "{project_id}"
+              merge_request_iid: "{iid}"
+              source_branch: "{source_branch}"
+              target_branch: "{target_branch}"
+            note: "不传 state_event 参数,仅用于查询"
+            extract_fields:
+              - "state: MR 状态(opened/merged/closed)"
+              - "merge_status: 合并状态(can_be_merged/cannot_be_merged)"
+              - "diff_refs.base_sha 和 diff_refs.head_sha: 判断是否有实际变更"
+              - "web_url: MR 页面链接"
+              - "sha: MR 最新的 head commit SHA"
+          
+          - method: "B - 搜索/筛选场景"
+            tool: "mcp_gitlab_browse_merge_requests"
+            params:
+              action: "list"
+              source_branch: "{source_branch}"
+              target_branch: "{target_branch}"
+              state: "opened"
+              per_page: 20
+            note: "MCP Proxy 已启用 schema 驱动的类型转换,per_page/page 等参数会自动处理"
+            scenarios:
+              - "409 冲突时查找已存在的 MR"
+              - "需要按条件筛选 MR(状态、标签、分支等)"
+              - "批量查询多个 MR"
+        
+        conflict_handling:
+          condition: "merge_status 为 cannot_be_merged"
+          checks:
+            - check: "比较 diff_refs.base_sha 和 diff_refs.head_sha"
+              if_same:
+                description: "无实际文件变更(已合并过)"
+                action: "执行关闭 MR 逻辑"
+                output: |
+                  ℹ️ MR 无文件变更(已合并过),自动关闭
+                  MR 链接: {web_url}
+                next: "继续执行后续步骤(视为合并成功)"
+              
+              if_different:
+                description: "存在实际冲突"
+                action: "立即停止执行"
+                error_message: |
+                  ❌ MR 创建失败: {source_branch} → {target_branch} 存在冲突,无法自动合并
+                  MR 链接: {web_url}
+                  请手动解决冲突后重试
+      
+      # 0.3 Review 检查逻辑
+      - step: 0.3
+        name: "review_check"
+        description: "当 NEED_REVIEW 为 true 时的处理逻辑"
+        condition: "NEED_REVIEW 为 true 或用户明确要求 review"
+        actions:
+          - "以可点击的 Markdown 链接格式输出 MR 链接: [点击查看 MR]({web_url})"
+          - "等待用户确认: 提示用户 Review 代码,确认无误后回复'继续'或'确认合并'"
+          - "停止自动执行: 等待用户回复后再继续"
+      
+      # 0.4 MR 合并逻辑
+      - step: 0.4
+        name: "mr_merge"
+        description: "合并 MR"
+        tool: "mcp_gitlab_manage_merge_request"
+        params:
+          action: "merge"
+          project_id: "{project_id}"
+          merge_request_iid: "{iid}"
+          source_branch: "{source_branch}"
+          target_branch: "{target_branch}"
+          merge_when_pipeline_succeeds: true
+        critical_note: "merge_when_pipeline_succeeds 必须设置为 true,严禁设置为 false"
+        merge_when_pipeline_succeeds_behavior:
+          true: "允许 GitLab 在流水线通过后自动合并(即使没有流水线也会立即合并)"
+          false: "可能导致合并失败,GitLab 会拒绝执行合并操作"
+        error_handling:
+          condition: "合并失败(如 405 错误)"
+          action: "立即停止执行"
+          error_message: |
+            ❌ MR 合并失败: {error_message}
+            MR 链接: {web_url}
+            请检查 MR 状态后手动处理
+      
+      # 0.5 关闭 MR 逻辑
+      - step: 0.5
+        name: "mr_close"
+        description: "关闭 MR"
+        tool: "mcp_gitlab_manage_merge_request"
+        params:
+          action: "update"
+          project_id: "{project_id}"
+          merge_request_iid: "{iid}"
+          source_branch: "{source_branch}"
+          target_branch: "{target_branch}"
+          state_event: "close"
+
+  # ----------------------------------------
+  # 步骤 1: 获取分支信息
+  # ----------------------------------------
+  - step: 1
+    name: "get_branch_info"
+    description: "解析源分支、项目路径、环境配置"
+    
+    config_reading_priority:
+      - level: 1
+        source: "项目根目录 config.yaml"
+        tool: "read_file"
+      
+      - level: 2
+        source: "Skill 目录下 template.yaml"
+        tool: "read_file"
+        note: "若 config.yaml 不存在或读取失败,则读取此文件"
+      
+      rule: "以读取到的配置为基础,缺失的值使用 template.yaml 中的默认值补充"
+      constraint: "必须每次重新读取,禁止使用上下文缓存"
+    
+    sub_steps:
+      # 1.1 解析 SOURCE_BRANCH 和项目路径
+      - step: 1.1
+        name: "parse_source_branch_and_project"
+        description: "解析源分支和项目路径"
+        rules:
+          - rule: "若用户传入了 branch:分支名,直接使用该分支作为 SOURCE_BRANCH"
+          - rule: "若 config.yaml 中配置了 projects.url,从 URL 中解析项目路径"
+          - rule: "若以上两者都未满足,执行以下命令(一次终端调用获取全部信息)"
+            command: "git branch --show-current && git remote get-url origin"
+            parsing:
+              - "第一行输出作为 SOURCE_BRANCH"
+              - "第二行输出解析为项目路径"
+      
+      # 1.2 解析其他配置
+      - step: 1.2
+        name: "parse_other_configs"
+        description: "解析环境、PERSONAL_BRANCH、TARGET_BRANCH"
+        fields:
+          - field: "ENV"
+            rule: "若用户传入了 dev/test/uat,则使用传入值;否则默认 dev"
+            multi_env_support: "支持逗号分隔的多环境,如 dev,test、test,uat 或 dev,test,uat"
+            execution_mode: "多环境模式下,按顺序依次执行每个环境的合并流程"
+          
+          - field: "PERSONAL_BRANCH"
+            source: "从 config.yaml 中根据 ENV 提取对应值"
+            note: "如果未配置(为空),则跳过步骤 2,直接执行步骤 3"
+          
+          - field: "TARGET_BRANCH"
+            source: "从 config.yaml 中根据 ENV 提取对应值"
+
+  # ----------------------------------------
+  # 步骤 2: 创建并合并 MR SOURCE_BRANCH → PERSONAL_BRANCH
+  # ----------------------------------------
+  - step: 2
+    name: "merge_to_personal_branch"
+    description: "创建并合并 MR 从 SOURCE_BRANCH 到 PERSONAL_BRANCH"
+    
+    skip_conditions:
+      - "PERSONAL_BRANCH 未配置(为空)"
+      - "SOURCE_BRANCH 与 PERSONAL_BRANCH 相同(当前分支就是中转分支,无需自我合并)"
+    on_skip: "直接进入步骤 3"
+    
+    source_branch: "{SOURCE_BRANCH}"
+    target_branch: "{PERSONAL_BRANCH}"
+    
+    sub_steps:
+      # 2.1 分支存在性检查
+      - step: 2.1
+        name: "check_personal_branch"
+        description: "检查 PERSONAL_BRANCH 是否存在"
+        reference: "参考步骤 0.1"
+        target_branch: "{PERSONAL_BRANCH}"
+      
+      # 2.2 创建 MR
+      - step: 2.2
+        name: "create_mr_to_personal"
+        description: "创建 MR"
+        tool: "mcp_gitlab_manage_merge_request"
+        params:
+          action: "create"
+          project_id: "{project_id}"
+          source_branch: "{SOURCE_BRANCH}"
+          target_branch: "{PERSONAL_BRANCH}"
+          title: "[AI] Auto: 合并 {SOURCE_BRANCH} 到 {PERSONAL_BRANCH}"
+        record: "记录返回的 MR IID(iid 字段),用于后续查询"
+      
+      # 2.3 MR 状态检查
+      - step: 2.3
+        name: "check_mr_status_personal"
+        description: "检查 MR 状态"
+        reference: "参考步骤 0.2"
+        note: "使用步骤 2.2 中获取的 MR IID 查询状态"
+      
+      # 2.4 Review 检查
+      - step: 2.4
+        name: "review_check_personal"
+        description: "如果启用 Review 模式"
+        reference: "参考步骤 0.3"
+        condition: "如果启用 Review 模式"
+      
+      # 2.5 合并 MR
+      - step: 2.5
+        name: "merge_mr_to_personal"
+        description: "合并 MR"
+        reference: "参考步骤 0.4"
+
+  # ----------------------------------------
+  # 步骤 3: 创建并合并 MR → TARGET_BRANCH
+  # ----------------------------------------
+  - step: 3
+    name: "merge_to_target_branch"
+    description: "创建并合并 MR 到 TARGET_BRANCH"
+    
+    source_branch_logic: |
+      如果步骤 2 已执行(PERSONAL_BRANCH 已配置且 SOURCE_BRANCH ≠ PERSONAL_BRANCH):
+        使用 {PERSONAL_BRANCH}
+      如果步骤 2 被跳过(PERSONAL_BRANCH 未配置,或 SOURCE_BRANCH === PERSONAL_BRANCH):
+        使用 {SOURCE_BRANCH}
+    
+    target_branch: "{TARGET_BRANCH}"
+    
+    sub_steps:
+      # 3.1 分支存在性检查
+      - step: 3.1
+        name: "check_target_branch"
+        description: "检查 TARGET_BRANCH 是否存在"
+        reference: "参考步骤 0.1"
+        target_branch: "{TARGET_BRANCH}"
+      
+      # 3.2 创建 MR
+      - step: 3.2
+        name: "create_mr_to_target"
+        description: "创建 MR"
+        tool: "mcp_gitlab_manage_merge_request"
+        params:
+          action: "create"
+          project_id: "{project_id}"
+          source_branch: "{根据规则确定的 source_branch}"
+          target_branch: "{TARGET_BRANCH}"
+          title: "[AI] Auto: 合并 {source_branch} 到 {TARGET_BRANCH}"
+        record: "记录返回的 MR IID(iid 字段),用于后续查询"
+        
+        error_handling_409:
+          condition: "MR 已存在(409 错误)"
+          resolution_steps:
+            - step: 1
+              method: "使用 browse_merge_requests 查找已存在的 MR(推荐)"
+              tool: "mcp_gitlab_browse_merge_requests"
+              params:
+                action: "list"
+                source_branch: "{source_branch}"
+                target_branch: "{TARGET_BRANCH}"
+                state: "opened"
+                per_page: 10
+              action: "查找源分支和目标分支匹配的 opened 状态 MR"
+              on_found: "记录其 IID,跳转到步骤 3.3 继续执行"
+            
+            - step: 2
+              method: "如果 browse_merge_requests 未找到"
+              description: "尝试从目标分支的 merge commit 提取 MR IID"
+              tool: "mcp_gitlab_browse_refs"
+              params:
+                action: "get_branch"
+                branch: "{TARGET_BRANCH}"
+              action: "从返回的 commit.message 中解析 MR IID(格式: See merge request {project}!{iid})"
+              on_found: "如果找到 IID,检查该 MR 状态,如果已合并则视为成功,跳转到步骤 3.3"
+            
+            - step: 3
+              method: "如果以上方法都失败"
+              output: |
+                ⚠️ 检测到已存在的 MR(409 冲突),但无法自动查询
+                
+                请在 GitLab 页面确认该 MR 状态:
+                🔗 [查看 MR](http://192.168.162.164:9081/{project_path}/merge_requests)
+                
+                如果 MR 已合并且源分支有新提交,请手动创建新 MR 后重试。
+                如果 MR 未合并,请手动处理(合并或关闭)后重试。
+      
+      # 3.3 MR 状态检查
+      - step: 3.3
+        name: "check_mr_status_target"
+        description: "检查 MR 状态"
+        reference: "参考步骤 0.2"
+        note: "使用 manage_merge_request 的 update 操作查询 MR 状态"
+      
+      # 3.4 Review 检查
+      - step: 3.4
+        name: "review_check_target"
+        description: "如果启用 Review 模式"
+        reference: "参考步骤 0.3"
+        condition: "如果启用 Review 模式"
+      
+      # 3.5 合并 MR
+      - step: 3.5
+        name: "merge_mr_to_target"
+        description: "合并 MR"
+        reference: "参考步骤 0.4"
+        required_params:
+          - "source_branch"
+          - "target_branch"
+          - "merge_request_iid (string)"
+          - "merge_when_pipeline_succeeds (必须为 true)"
+        critical_constraint: "merge_when_pipeline_succeeds 必须为 true,设置为 false 会导致合并失败"
+        error_handling:
+          condition: "合并失败(405 错误)"
+          description: "可能是 MR 已合并或状态异常,检查 MR 状态"
+
+  # ----------------------------------------
+  # 步骤 4: 验证与完成
+  # ----------------------------------------
+  - step: 4
+    name: "verify_and_complete"
+    description: "验证 MR 状态并输出完成信息"
+    
+    single_env_mode:
+      conditions:
+        - condition: "PERSONAL_BRANCH 已配置"
+          verification: "确认两个 MR 状态为 merged"
+        
+        - condition: "PERSONAL_BRANCH 未配置"
+          verification: "确认 SOURCE_BRANCH → TARGET_BRANCH 的 MR 状态为 merged"
+      
+      final_checks:
+        - "确认 {TARGET_BRANCH} 分支已更新"
+      
+      output: |
+        ✅ CI 流程完成
+
+        📋 合并汇总:
+        | 项目 | 值 |
+        |------|-----|
+        | 源分支 | {SOURCE_BRANCH} |
+        | 目标分支 | {TARGET_BRANCH} |
+        | MR 状态 | ✅ merged |
+        | MR 链接 | [点击查看 MR]({url}) |
+
+        💡 如需部署,请执行:
+        /cd {ENV}                    # 部署当前分支
+        /cd {ENV} branch:xxx         # 部署指定分支
+    
+    multi_env_mode:
+      description: "当指定多个环境(如 dev,test)时"
+      rules:
+        - "按环境顺序依次执行步骤 2 和步骤 3"
+        - "每个环境独立执行完整的合并流程"
+        - "前一个环境合并成功后,继续下一个环境"
+        - "任一环境合并失败,立即停止执行"
+
+  # ----------------------------------------
+  # 步骤 5: 执行 CD 部署（可选）
+  # ----------------------------------------
+  - step: 5
+    name: "execute_cd_deployment"
+    description: "当 NEED_DEPLOY=true 时，触发 CD 部署流程"
+    condition: "NEED_DEPLOY=true (命令中包含 /cd、发布、部署 关键词)"
+    
+    sub_steps:
+      # 5.1 触发 CD 部署流程
+      - step: 5.1
+        name: "trigger_cd_flow"
+        description: "按照 CD skill 的规范执行部署流程"
+        strategy: "进入 CD 部署流程，由 CD 规范指导执行"
+        
+        execution_logic: |
+          1. 读取 CD skill 规范（如果可用）：
+             - 优先读取 CD skill 文档了解部署规范
+             - 若无法读取，使用内置的 CD 部署逻辑
+          
+          2. 按照 CD 部署流程执行：
+             - 验证 Jenkins MCP 可用性
+             - 读取 config.yaml 中的 Jenkins 配置
+             - 按环境顺序逐个触发构建
+             - 处理参数交互（如需要）
+          
+          3. 收集部署结果：
+             - 记录每个环境的队列 ID
+             - 记录构建链接
+          
+          4. 返回部署结果给 CI 流程
+        
+        cd_flow_reference: |
+          部署流程参考 CD skill 规范：
+          - 步骤 1: 获取部署信息（解析环境、分支、Job）
+          - 步骤 2: 参数处理与交互（如 BUILD_NAME 为空时）
+          - 步骤 3: 触发 Jenkins 构建（逐个环境）
+          - 步骤 4: 输出部署结果
+        
+        critical_note: |
+          ⚠️ 关键原则：
+          - 这是进入 CD 部署流程，不是直接调用工具
+          - 按照 CD skill 的规范逐步执行
+          - 多环境部署时按顺序逐个执行
+          - 需要交互时必须暂停等待用户确认
+      
+      # 5.2 多环境部署
+      - step: 5.2
+        name: "multi_env_deployment"
+        description: "按环境顺序逐个触发部署"
+        action: "记录每个环境的队列 ID"
+      
+      # 5.3 输出部署结果
+      - step: 5.3
+        name: "output_deployment_result"
+        description: "输出部署结果"
+        format: "Markdown 表格格式"
+
+  # ----------------------------------------
+  # 步骤 6: 输出最终汇总
+  # ----------------------------------------
+  - step: 6
+    name: "output_final_summary"
+    description: "输出最终汇总信息"
+    format_requirement: "必须使用 Markdown 表格格式,严禁使用 plaintext 或列表格式"
+    
+    ci_only_mode:
+      condition: "NEED_DEPLOY=false"
+      output: |
+        ✅ CI 流程完成
+
+        📋 合并汇总:
+
+        | 项目 | 值 |
+        |------|-----|
+        | 源分支 | {SOURCE_BRANCH} |
+        | 目标分支 | {TARGET_BRANCH} |
+        | MR 状态 | ✅ merged |
+        | MR 链接 | [点击查看 MR]({url}) |
+
+        💡 如需部署,请执行:
+        /cd {ENV}                    # 部署当前分支
+        /cd {ENV} branch:xxx         # 部署指定分支
+    
+    ci_cd_mode:
+      condition: "NEED_DEPLOY=true"
+      output: |
+        ✅ CI/CD 流程完成
+
+        📋 合并汇总:
+
+        | 项目 | 值 |
+        |------|-----|
+        | 源分支 | {SOURCE_BRANCH} |
+        | 目标分支 | {TARGET_BRANCH} |
+        | MR 状态 | ✅ merged |
+        | MR 链接 | [点击查看 MR]({url}) |
+
+        📋 部署汇总:
+
+        | 环境 | 队列 ID | 构建链接 |
+        |------|---------|----------|
+        | ✅ {ENV} | {queue_id} | [点击查看构建进度]({url}) |

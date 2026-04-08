@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=
+# 环境分支映射配置
+# 支持多项目配置，每个项目可定义多个环境
+projects:
+  # 默认项目配置（当未匹配到具体项目时使用）
+  default:
+    environments:
+      dev:
+        personal_branch: "" 
+        target_branch: "develop"
+      test:
+        personal_branch: ""
+        target_branch: "test"
+      uat:
+        personal_branch: ""
+        target_branch: "uat"
+
+# 可选：MR 标题模板配置（覆盖默认模板）
+templates:
+  mr_title: "[AI] Auto: 合并 {source_branch} 到 {target_branch}"
+  mr_description: |
+    自动化合并请求
+    - 源分支: {source_branch}
+    - 目标分支: {target_branch}
+    - 触发环境: {env}
+    - 触发时间: {timestamp}
+
+jenkins:
+  is_current_branch: false
+  
+  # 广告主服务
+  '广告主开发':
+    fullname: "dev-platforms-advertiser-140.227"
+    url: "http://10.169.140.235:30866/job/dev-platforms-advertiser-140.227/"
+  '广告主测试':
+    fullname: "test-platforms-advertiser-140.227"
+    url: "http://10.169.140.235:30866/job/test-platforms-advertiser-140.227/"
+  
+  # 流量主服务
+  '流量主开发':
+    fullname: "dev-platforms-adpublisher-140.227"
+    url: "http://10.169.140.235:30866/job/dev-platforms-adpublisher-140.227/"
+  '流量主测试':
+    fullname: "test-platforms-adpublisher-140.227"
+    url: "http://10.169.140.235:30866/job/test-platforms-adpublisher-140.227/"
+  
+  # 商户服务
+  '商户开发':
+    fullname: "dev-platforms-merchant-140.227"
+    url: "http://10.169.140.235:30866/job/dev-platforms-merchant-140.227/"
+  '商户测试':
+    fullname: "test-platforms-merchant-140.227"
+    url: "http://10.169.140.235:30866/job/test-platforms-merchant-140.227/"
+  
+  # 商户云付服务
+  '商户云付开发':
+    fullname: "dev-platforms-merchant-yyf-140.227"
+    url: "http://10.169.140.235:30866/job/dev-platforms-merchant-yyf-140.227/"
+  '商户云付测试':
+    fullname: "test-platforms-merchant-yyf-140.227"
+    url: "http://10.169.140.235:30866/job/test-platforms-merchant-yyf-140.227/"
+  
+  # 运营服务
+  '运营开发':
+    fullname: "dev-unified-platforms-operation-140.227"
+    url: "http://10.169.140.235:30866/job/dev-unified-platforms-operation-140.227/"
+  '运营测试':
+    fullname: "test-unified-platforms-operation-140.227"
+    url: "http://10.169.140.235:30866/job/test-unified-platforms-operation-140.227/"
+
+# 准生产/生产环境 Jenkins (10.168.171.71:28080)
+jenkins-prod:
+  is_current_branch: false
+  # 准生产环境 (UAT)
+  '广告主准生产':
+    fullname: "uat-gtqt-platforms-advertiser-150.27"
+    url: "http://10.168.171.71:28080/job/uat-gtqt-platforms-advertiser-150.27/"
+  '流量主准生产':
+    fullname: "uat-gtqt-platforms-adpublisher-150.27"
+    url: "http://10.168.171.71:28080/job/uat-gtqt-platforms-adpublisher-150.27/"
+  '商户准生产':
+    fullname: "uat-gtqt-platforms-merchant-150.27"
+    url: "http://10.168.171.71:28080/job/uat-gtqt-platforms-merchant-150.27/"
+  '商户云付准生产':
+    fullname: "uat-gtqt-platforms-merchant-yyf-150.27"
+    url: "http://10.168.171.71:28080/job/uat-gtqt-platforms-merchant-yyf-150.27/"
+  '运营准生产':
+    fullname: "uat-gtqt-platforms-operation"
+    url: "http://10.168.171.71:28080/job/uat-gtqt-platforms-operation/"
+  '服务商准生产':
+    fullname: "uat-gtqt-platforms-agent"
+    url: "http://10.168.171.71:28080/job/uat-gtqt-platforms-agent/"
+  # 生产环境 (PROD)
+  '广告主生产':
+    fullname: "prod-gtqt-platforms-adpublisher"
+    url: "http://10.168.171.71:28080/job/prod-gtqt-platforms-adpublisher/"
+
+defaults:
+  env: "dev"           # 默认环境
+  need_review: false   # 默认是否需要 review
