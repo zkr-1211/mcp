@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm run build
       - run: npx pkg . -t ${{ matrix.target }} -o release/${{ matrix.output }}
       - uses: actions/upload-artifact@v4
@@ -51,7 +51,7 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
