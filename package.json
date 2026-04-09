@@ -8,8 +8,8 @@
     "postar-pipe-mcp": "dist/server.js"
   },
   "files": [
-    "dist",
-    "release"
+    "bin",
+    "dist"
   ],
   "scripts": {
     "build": "vite build && npm run copy:skills",
@@ -17,7 +17,7 @@
     "copy:skills": "cp -r src/skills dist/",
     "dev": "vite",
     "start": "node dist/server.js",
-    "prepare": "npm run build",
+    "postinstall": "node bin/install.js",
     "pkg:build": "npm run build && pkg . -t node24-macos-arm64",
     "release": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",

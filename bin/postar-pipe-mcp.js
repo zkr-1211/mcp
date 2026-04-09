@@ -22,12 +22,14 @@ const archMap = {
 
 const currentPlatform = platformMap[platform()] || platform();
 const currentArch = archMap[arch()] || 'x64';
+const isWindows = platform() === 'win32';
+const ext = isWindows ? '.exe' : '';
 
 // 尝试的顺序：先精确匹配，再尝试其他
 const binaryNames = [
-  `postar-pipe-mcp-${currentPlatform}-${currentArch}`,
+  `postar-pipe-mcp-${currentPlatform}-${currentArch}${ext}`,
   currentPlatform === 'macos' ? `postar-pipe-mcp-${currentPlatform}-x64` : null,
-  'postar-pipe-mcp'  // fallback to default
+  `postar-pipe-mcp${ext}`,
 ].filter(Boolean);
 
 const releaseDir = join(__dirname, '..', 'release');

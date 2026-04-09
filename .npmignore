@@ -6,8 +6,9 @@ coverage/
 *.tgz
 .tmp/
 src/
-dist/
+release/
 test-*.ts
 vite.config.ts
 tsconfig.json
 .gitignore
+.github/
