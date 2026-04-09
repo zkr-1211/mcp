@@ -51,7 +51,7 @@ if (!existsSync(releaseDir)) {
   mkdirSync(releaseDir, { recursive: true });
 }
 
-console.log(`[postar-pipe-mcp] Downloading ${binaryName} from OSS...`);
+console.log(`[postar-pipe-mcp] Downloading ${binaryName} from GitHub Release...`);
 console.log(`[postar-pipe-mcp] URL: ${downloadUrl}`);
 
 function download(url, dest, redirectCount = 0) {
