@@ -57,8 +57,10 @@
     ],
     "assets": [
       "dist/skills/**/*",
-      "node_modules/gitlab-core-mcp/**/*",
-      "node_modules/jenkins-mcp/**/*"
+      "node_modules/gitlab-core-mcp/**/*.js",
+      "node_modules/gitlab-core-mcp/**/*.json",
+      "node_modules/jenkins-mcp/**/*.js",
+      "node_modules/jenkins-mcp/**/*.json"
     ],
     "targets": [
       "node24-macos-arm64",
