@@ -124,6 +124,9 @@ function download(url, dest, redirectCount = 0) {
           chmodSync(dest, 0o755);
         }
         console.log(`[postar-pipe-mcp] Download complete: ${dest}`);
+        
+        // 修复 npx 执行权限问题
+        fixBinPermissions();
       });
     });
   }).on('error', (err) => {
@@ -131,4 +134,25 @@ function download(url, dest, redirectCount = 0) {
     console.error(`[postar-pipe-mcp] Download error: ${err.message}`);
     tryDownload();
   });
+}
+
+// 修复 bin 文件执行权限（npm publish 会丢失权限）
+function fixBinPermissions() {
+  if (isWindows) return;
+  
+  const binPath = join(__dirname, 'postar-pipe-mcp.js');
+  const distPath = join(__dirname, '..', 'dist', 'server.js');
+  
+  try {
+    if (existsSync(binPath)) {
+      chmodSync(binPath, 0o755);
+      console.log('[postar-pipe-mcp] Fixed bin/postar-pipe-mcp.js permissions');
+    }
+    if (existsSync(distPath)) {
+      chmodSync(distPath, 0o755);
+      console.log('[postar-pipe-mcp] Fixed dist/server.js permissions');
+    }
+  } catch (err) {
+    console.error(`[postar-pipe-mcp] Failed to fix permissions: ${err.message}`);
+  }
 }
