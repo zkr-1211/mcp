@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { platform, arch } from 'os';
+import { accessSync, constants } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,7 +36,7 @@ let binaryPath = null;
 for (const name of binaryNames) {
   const fullPath = join(releaseDir, name);
   try {
-    await import('fs').then(fs => fs.accessSync(fullPath, fs.constants.X_OK));
+    accessSync(fullPath, constants.X_OK);
     binaryPath = fullPath;
     break;
   } catch {

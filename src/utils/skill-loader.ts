@@ -5,6 +5,7 @@
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, readdirSync, existsSync, statSync, mkdirSync, copyFileSync, writeFileSync } from 'fs';
+import * as yaml from 'js-yaml';
 
 // 缓存 skill 内容(带时间戳)
 interface CacheEntry<T> {
@@ -613,8 +614,6 @@ async function parseFrontmatter(content: string): Promise<{ metadata: Record<str
 
   // 尝试使用 YAML 解析（如果可用）
   try {
-    // 动态导入 js-yaml 解析器
-    const yaml = await import('js-yaml');
     const metadata = yaml.load(frontmatterText) || {};
     return { metadata, body };
   } catch {
