@@ -2,6 +2,13 @@
  * MCP 客户端注册
  */
 import { getMCPClientManager } from './mcp-client.js';
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
 
 interface JenkinsInstance {
   name: string;
@@ -66,22 +73,36 @@ function parseJenkinsInstances(): JenkinsInstance[] {
 }
 
 /**
+ * 获取包的入口文件路径
+ */
+function getPackageEntry(packageName: string): string | null {
+  try {
+    const pkgPath = require.resolve(`${packageName}/package.json`);
+    const pkg = require(pkgPath);
+    const bin = pkg.bin;
+    const binPath = typeof bin === 'string' ? bin : Object.values(bin)[0];
+    return join(dirname(pkgPath), binPath as string);
+  } catch (error) {
+    console.error(`[MCP-PIPE] 无法找到 ${packageName}:`, error);
+    return null;
+  }
+}
+
+/**
  * 注册 GitLab MCP
  */
-async function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): Promise<void> {
+function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
   const gitlabToken = process.env.GITLAB_TOKEN;
   const gitlabUrl = process.env.GITLAB_URL || 'https://gitlab.com';
 
   if (gitlabToken) {
-    // 使用当前 Node 运行时直接启动已安装的包，兼容 pkg 打包后的环境
     const nodePath = process.execPath;
-    // 动态获取 gitlab-core-mcp 的入口文件路径
-    const { createRequire } = await import('module');
-    const require = createRequire(import.meta.url);
-    const gitlabPkgPath = require.resolve('gitlab-core-mcp/package.json');
-    const { bin } = require(gitlabPkgPath);
-    const gitlabBin = typeof bin === 'string' ? bin : Object.values(bin)[0];
-    const gitlabPath = gitlabPkgPath.replace('/package.json', '') + '/' + gitlabBin;
+    const gitlabPath = getPackageEntry('gitlab-core-mcp');
+
+    if (!gitlabPath) {
+      console.error('[MCP-PIPE] 警告：gitlab-core-mcp 未安装，GitLab 功能不可用');
+      return;
+    }
 
     manager.registerConfig('gitlab', {
       name: 'gitlab',
@@ -101,7 +122,7 @@ async function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): 
 /**
  * 注册 Jenkins MCP 实例
  */
-async function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager>): Promise<void> {
+function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager>): void {
   const instances = parseJenkinsInstances();
 
   if (instances.length === 0) {
@@ -109,14 +130,13 @@ async function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientM
     return;
   }
 
-  // 动态获取 jenkins-mcp 的入口文件路径
-  const { createRequire } = await import('module');
-  const require = createRequire(import.meta.url);
-  const jenkinsPkgPath = require.resolve('jenkins-mcp/package.json');
-  const { bin } = require(jenkinsPkgPath);
-  const jenkinsBin = typeof bin === 'string' ? bin : Object.values(bin)[0];
-  const jenkinsPath = jenkinsPkgPath.replace('/package.json', '') + '/' + jenkinsBin;
   const nodePath = process.execPath;
+  const jenkinsPath = getPackageEntry('jenkins-mcp');
+
+  if (!jenkinsPath) {
+    console.error('[MCP-PIPE] 警告：jenkins-mcp 未安装，Jenkins 功能不可用');
+    return;
+  }
 
   for (const instance of instances) {
     manager.registerConfig(instance.name, {
@@ -139,9 +159,9 @@ async function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientM
 /**
  * 初始化所有 MCP 客户端
  */
-export async function initMCPClients(): Promise<void> {
+export function initMCPClients(): void {
   const manager = getMCPClientManager();
 
-  await registerGitLab(manager);
-  await registerJenkinsInstances(manager);
+  registerGitLab(manager);
+  registerJenkinsInstances(manager);
 }
