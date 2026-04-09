@@ -180,7 +180,7 @@ async function main(): Promise<void> {
   await extractAllSkillResourcesToTempDir(skillResourcesDir);
 
   // 4. 初始化 MCP 客户端
-  initMCPClients();
+  await initMCPClients();
 
   // 5. 创建并启动 Server
   const server = await createServer();

@@ -68,15 +68,25 @@ function parseJenkinsInstances(): JenkinsInstance[] {
 /**
  * 注册 GitLab MCP
  */
-function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
+async function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): Promise<void> {
   const gitlabToken = process.env.GITLAB_TOKEN;
   const gitlabUrl = process.env.GITLAB_URL || 'https://gitlab.com';
 
   if (gitlabToken) {
+    // 使用当前 Node 运行时直接启动已安装的包，兼容 pkg 打包后的环境
+    const nodePath = process.execPath;
+    // 动态获取 gitlab-core-mcp 的入口文件路径
+    const { createRequire } = await import('module');
+    const require = createRequire(import.meta.url);
+    const gitlabPkgPath = require.resolve('gitlab-core-mcp/package.json');
+    const { bin } = require(gitlabPkgPath);
+    const gitlabBin = typeof bin === 'string' ? bin : Object.values(bin)[0];
+    const gitlabPath = gitlabPkgPath.replace('/package.json', '') + '/' + gitlabBin;
+
     manager.registerConfig('gitlab', {
       name: 'gitlab',
-      command: 'npx',
-      args: ['-y', 'gitlab-core-mcp'],
+      command: nodePath,
+      args: [gitlabPath],
       env: {
         GITLAB_API_URL: gitlabUrl,
         GITLAB_TOKEN: gitlabToken,
@@ -91,7 +101,7 @@ function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
 /**
  * 注册 Jenkins MCP 实例
  */
-function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager>): void {
+async function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager>): Promise<void> {
   const instances = parseJenkinsInstances();
 
   if (instances.length === 0) {
@@ -99,13 +109,21 @@ function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager
     return;
   }
 
+  // 动态获取 jenkins-mcp 的入口文件路径
+  const { createRequire } = await import('module');
+  const require = createRequire(import.meta.url);
+  const jenkinsPkgPath = require.resolve('jenkins-mcp/package.json');
+  const { bin } = require(jenkinsPkgPath);
+  const jenkinsBin = typeof bin === 'string' ? bin : Object.values(bin)[0];
+  const jenkinsPath = jenkinsPkgPath.replace('/package.json', '') + '/' + jenkinsBin;
+  const nodePath = process.execPath;
+
   for (const instance of instances) {
     manager.registerConfig(instance.name, {
       name: instance.name,
-      command: 'npx',
+      command: nodePath,
       args: [
-        '-y',
-        'jenkins-mcp',
+        jenkinsPath,
         '--jenkins-url',
         instance.url,
         '--jenkins-username',
@@ -121,9 +139,9 @@ function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager
 /**
  * 初始化所有 MCP 客户端
  */
-export function initMCPClients(): void {
+export async function initMCPClients(): Promise<void> {
   const manager = getMCPClientManager();
 
-  registerGitLab(manager);
-  registerJenkinsInstances(manager);
+  await registerGitLab(manager);
+  await registerJenkinsInstances(manager);
 }
