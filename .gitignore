@@ -1,6 +1,6 @@
 node_modules/
 dist/
-release/
+# release/ is managed by CI
 *.log
 .env
 .DS_Store
