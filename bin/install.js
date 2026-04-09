@@ -9,9 +9,13 @@ import { readFileSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 下载源配置（OSS 优先，GitHub 备用）
+// 下载源配置（gh-proxy.com 优先，镜像备用）
 const GITHUB_REPO = 'zkr-1211/mcp';
-const OSS_BASE_URL = 'https://mcp-binary-proxy.mcp-binary-proxy.workers.dev';
+const GITHUB_BASE_URL = `https://github.com/${GITHUB_REPO}/releases/download`;
+const MIRROR_URLS = [
+  `https://gh-proxy.com/https://github.com/${GITHUB_REPO}/releases/download`,
+  `https://mirror.ghproxy.com/https://github.com/${GITHUB_REPO}/releases/download`,
+];
 
 const pkgJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 const version = pkgJson.version;
@@ -38,9 +42,7 @@ if (!currentPlatform) {
 
 const isWindows = platform() === 'win32';
 const binaryName = `postar-pipe-mcp-${currentPlatform}-${currentArch}${isWindows ? '.exe' : ''}`;
-const ossUrl = `${OSS_BASE_URL}/${version}/${binaryName}`;
-const githubUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${binaryName}`;
-const downloadUrl = ossUrl; // 主下载地址
+const githubUrl = `${GITHUB_BASE_URL}/v${version}/${binaryName}`;
 
 const releaseDir = join(__dirname, '..', 'release');
 const destPath = join(releaseDir, binaryName);
@@ -54,13 +56,36 @@ if (!existsSync(releaseDir)) {
   mkdirSync(releaseDir, { recursive: true });
 }
 
-console.log(`[postar-pipe-mcp] Downloading ${binaryName} from OSS...`);
-console.log(`[postar-pipe-mcp] URL: ${downloadUrl}`);
+console.log(`[postar-pipe-mcp] Downloading ${binaryName}...`);
+
+// 尝试多个下载源
+const downloadUrls = [
+  ...MIRROR_URLS.map(m => `${m}/v${version}/${binaryName}`),
+  githubUrl,
+];
+
+let currentUrlIndex = 0;
+
+function tryDownload() {
+  if (currentUrlIndex >= downloadUrls.length) {
+    console.error('[postar-pipe-mcp] All download sources failed');
+    console.error(`[postar-pipe-mcp] You can manually download from: ${githubUrl}`);
+    process.exit(0);
+  }
+
+  const url = downloadUrls[currentUrlIndex];
+  console.log(`[postar-pipe-mcp] Attempt ${currentUrlIndex + 1}/${downloadUrls.length}: ${url}`);
+  download(url, destPath);
+  currentUrlIndex++;
+}
+
+tryDownload();
 
 function download(url, dest, redirectCount = 0) {
   if (redirectCount > 5) {
     console.error('[postar-pipe-mcp] Too many redirects');
-    process.exit(1);
+    tryDownload();
+    return;
   }
 
   const file = createWriteStream(dest);
@@ -74,14 +99,8 @@ function download(url, dest, redirectCount = 0) {
 
     if (response.statusCode !== 200) {
       file.close();
-      if (url === ossUrl) {
-        console.warn(`[postar-pipe-mcp] OSS download failed (HTTP ${response.statusCode}), falling back to GitHub...`);
-        download(githubUrl, dest, 0);
-      } else {
-        console.error(`[postar-pipe-mcp] Download failed: HTTP ${response.statusCode}`);
-        console.error(`[postar-pipe-mcp] You can manually download from: ${githubUrl}`);
-        process.exit(0);
-      }
+      console.error(`[postar-pipe-mcp] Download failed: HTTP ${response.statusCode}`);
+      tryDownload();
       return;
     }
 
@@ -109,15 +128,7 @@ function download(url, dest, redirectCount = 0) {
     });
   }).on('error', (err) => {
     file.close();
-    if (url === ossUrl) {
-      console.warn(`[postar-pipe-mcp] OSS download error: ${err.message}, falling back to GitHub...`);
-      download(githubUrl, dest, 0);
-    } else {
-      console.error(`[postar-pipe-mcp] Download error: ${err.message}`);
-      console.error(`[postar-pipe-mcp] You can manually download from: ${githubUrl}`);
-      process.exit(0); // 不阻断安装
-    }
+    console.error(`[postar-pipe-mcp] Download error: ${err.message}`);
+    tryDownload();
   });
 }
-
-download(downloadUrl, destPath);

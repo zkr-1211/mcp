@@ -19,7 +19,16 @@ export default {
     // 构建 GitHub Release 下载 URL
     const githubUrl = `https://github.com/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/releases/download/v${version}/${filename}`;
 
-    // 重定向到 GitHub Release（Cloudflare 会自动缓存和加速）
-    return Response.redirect(githubUrl, 302);
+    // 直接代理请求（保持二进制流）
+    const response = await fetch(githubUrl, {
+      method: request.method,
+      headers: request.headers,
+      redirect: 'follow',
+    });
+
+    return new Response(response.body, {
+      status: response.status,
+      headers: response.headers,
+    });
   },
 };
