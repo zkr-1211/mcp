@@ -9,11 +9,8 @@ import { readFileSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// =====================================================
-// TODO: 修改为你的 OSS 地址
-// 格式: https://<bucket>.<region>.aliyuncs.com
-const OSS_BASE_URL = 'https://YOUR-BUCKET.oss-cn-hangzhou.aliyuncs.com';
-// =====================================================
+// GitHub 仓库信息（改成你的 owner/repo）
+const GITHUB_REPO = 'zkr-1211/mcp';
 
 const pkgJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 const version = pkgJson.version;
@@ -40,7 +37,7 @@ if (!currentPlatform) {
 
 const isWindows = platform() === 'win32';
 const binaryName = `postar-pipe-mcp-${currentPlatform}-${currentArch}${isWindows ? '.exe' : ''}`;
-const downloadUrl = `${OSS_BASE_URL}/postar-pipe-mcp/${version}/${binaryName}`;
+const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${binaryName}`;
 
 const releaseDir = join(__dirname, '..', 'release');
 const destPath = join(releaseDir, binaryName);
