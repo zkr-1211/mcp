@@ -1,0 +1,8 @@
+# Cloudflare Workers 配置
+name = "mcp-binary-proxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+GITHUB_OWNER = "zkr-1211"
+GITHUB_REPO = "mcp"

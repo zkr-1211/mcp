@@ -9,8 +9,9 @@ import { readFileSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// GitHub 仓库信息（改成你的 owner/repo）
+// 下载源配置（OSS 优先，GitHub 备用）
 const GITHUB_REPO = 'zkr-1211/mcp';
+const OSS_BASE_URL = 'https://mcp-binary-proxy.mcp-binary-proxy.workers.dev';
 
 const pkgJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 const version = pkgJson.version;
@@ -37,7 +38,9 @@ if (!currentPlatform) {
 
 const isWindows = platform() === 'win32';
 const binaryName = `postar-pipe-mcp-${currentPlatform}-${currentArch}${isWindows ? '.exe' : ''}`;
-const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${binaryName}`;
+const ossUrl = `${OSS_BASE_URL}/${version}/${binaryName}`;
+const githubUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${binaryName}`;
+const downloadUrl = ossUrl; // 主下载地址
 
 const releaseDir = join(__dirname, '..', 'release');
 const destPath = join(releaseDir, binaryName);
@@ -51,7 +54,7 @@ if (!existsSync(releaseDir)) {
   mkdirSync(releaseDir, { recursive: true });
 }
 
-console.log(`[postar-pipe-mcp] Downloading ${binaryName} from GitHub Release...`);
+console.log(`[postar-pipe-mcp] Downloading ${binaryName} from OSS...`);
 console.log(`[postar-pipe-mcp] URL: ${downloadUrl}`);
 
 function download(url, dest, redirectCount = 0) {
@@ -71,9 +74,15 @@ function download(url, dest, redirectCount = 0) {
 
     if (response.statusCode !== 200) {
       file.close();
-      console.error(`[postar-pipe-mcp] Download failed: HTTP ${response.statusCode}`);
-      console.error(`[postar-pipe-mcp] You can manually download from: ${downloadUrl}`);
-      process.exit(0); // 不阻断安装，用户可手动处理
+      if (url === ossUrl) {
+        console.warn(`[postar-pipe-mcp] OSS download failed (HTTP ${response.statusCode}), falling back to GitHub...`);
+        download(githubUrl, dest, 0);
+      } else {
+        console.error(`[postar-pipe-mcp] Download failed: HTTP ${response.statusCode}`);
+        console.error(`[postar-pipe-mcp] You can manually download from: ${githubUrl}`);
+        process.exit(0);
+      }
+      return;
     }
 
     const total = parseInt(response.headers['content-length'] || '0', 10);
@@ -100,9 +109,14 @@ function download(url, dest, redirectCount = 0) {
     });
   }).on('error', (err) => {
     file.close();
-    console.error(`[postar-pipe-mcp] Download error: ${err.message}`);
-    console.error(`[postar-pipe-mcp] You can manually download from: ${downloadUrl}`);
-    process.exit(0); // 不阻断安装
+    if (url === ossUrl) {
+      console.warn(`[postar-pipe-mcp] OSS download error: ${err.message}, falling back to GitHub...`);
+      download(githubUrl, dest, 0);
+    } else {
+      console.error(`[postar-pipe-mcp] Download error: ${err.message}`);
+      console.error(`[postar-pipe-mcp] You can manually download from: ${githubUrl}`);
+      process.exit(0); // 不阻断安装
+    }
   });
 }
 
