@@ -26,8 +26,8 @@ if (isPkgEnvironment) {
     console.error('Failed to load server:', err);
     process.exit(1);
   });
-  // 等待异步加载，不要退出
-  return;
+  // 保持进程运行，等待异步加载
+  process.stdin.resume();
 }
 
 // npx 安装场景：查找并启动二进制文件

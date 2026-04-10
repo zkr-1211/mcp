@@ -64,7 +64,6 @@
     ],
     "assets": [
       "dist/skills/**/*",
-      "release/**/*",
       "node_modules/gitlab-core-mcp/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.json",
       "node_modules/jenkins-mcp/**/*.js",
