@@ -26,16 +26,6 @@ jobs:
       - run: npm install --legacy-peer-deps
       - run: npm run build
       - run: npx @yao-pkg/pkg dist/server.js -t ${{ matrix.target }} -o release/${{ matrix.output }} --compress Brotli --config package.json
-      - name: Compress with UPX
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install upx
-          upx --best --lzma release/${{ matrix.output }}
-      - name: Compress with UPX (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          choco install upx
-          upx --best --lzma release/${{ matrix.output }}
       - name: Show compressed size
         run: ls -lh release/${{ matrix.output }}
       - uses: actions/upload-artifact@v4
