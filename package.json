@@ -1,6 +1,6 @@
 {
   "name": "postar-pipe-mcp",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Unified CI/CD MCP Server - orchestrates GitLab and Jenkins MCPs with dynamic skills",
   "repository": {
     "type": "git",
