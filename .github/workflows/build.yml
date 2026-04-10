@@ -14,12 +14,6 @@ jobs:
           - os: macos-latest
             target: node24-macos-arm64
             output: postar-pipe-mcp-macos-arm64
-          - os: macos-14
-            target: node24-macos-x64
-            output: postar-pipe-mcp-macos-x64
-          - os: ubuntu-latest
-            target: node24-linux-x64
-            output: postar-pipe-mcp-linux-x64
           - os: windows-latest
             target: node24-win-x64
             output: postar-pipe-mcp-win-x64.exe

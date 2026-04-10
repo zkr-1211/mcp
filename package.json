@@ -58,11 +58,13 @@
   "pkg": {
     "scripts": [
       "dist/**/*.js",
+      "bin/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.js",
       "node_modules/jenkins-mcp/**/*.js"
     ],
     "assets": [
       "dist/skills/**/*",
+      "release/**/*",
       "node_modules/gitlab-core-mcp/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.json",
       "node_modules/jenkins-mcp/**/*.js",

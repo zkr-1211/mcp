@@ -3,11 +3,34 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { platform, arch } from 'os';
-import { accessSync, constants } from 'fs';
+import { accessSync, constants, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// 检测是否在 pkg 打包环境中运行
+const isPkgEnvironment = process.argv[0].includes('/snapshot/') || 
+                          process.execPath.includes('/snapshot/') ||
+                          existsSync('/snapshot');
+
+if (isPkgEnvironment) {
+  // 在二进制文件中，直接运行主程序
+  const serverPath = join(__dirname, '..', 'dist', 'server.js');
+  if (!existsSync(serverPath)) {
+    console.error('Error: dist/server.js not found in binary');
+    process.exit(1);
+  }
+  
+  // 动态导入并运行
+  import(serverPath).catch(err => {
+    console.error('Failed to load server:', err);
+    process.exit(1);
+  });
+  // 等待异步加载，不要退出
+  return;
+}
+
+// npx 安装场景：查找并启动二进制文件
 const platformMap = {
   'darwin': 'macos',
   'linux': 'linux',
