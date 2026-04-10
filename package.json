@@ -56,6 +56,7 @@
     "node": ">=18.0.0"
   },
   "pkg": {
+    "entry": "dist/server.js",
     "scripts": [
       "dist/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.js",
