@@ -25,7 +25,8 @@ jobs:
           node-version: '24'
       - run: npm install --legacy-peer-deps
       - run: npm run build
-      - run: npx @yao-pkg/pkg . -t ${{ matrix.target }}
+      - run: npx @yao-pkg/pkg . -t ${{ matrix.target }} -o release/${{ matrix.output }}
+      - run: ls -la release/
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
