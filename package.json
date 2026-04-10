@@ -1,6 +1,6 @@
 {
   "name": "postar-pipe-mcp",
-  "version": "1.2.14",
+  "version": "1.2.12",
   "description": "Unified CI/CD MCP Server - orchestrates GitLab and Jenkins MCPs with dynamic skills",
   "repository": {
     "type": "git",
@@ -43,10 +43,7 @@
     "jenkins-mcp": "^0.2.1",
     "js-yaml": "^4.1.0",
     "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.5",
-    "hono": "^4.0.0",
-    "@cfworker/json-schema": "^2.0.0",
-    "pkce-challenge": "^4.0.0"
+    "zod-to-json-schema": "^3.23.5"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
@@ -63,16 +60,12 @@
     "entry": "dist/server.js",
     "scripts": [
       "dist/**/*.js",
-      "node_modules/@modelcontextprotocol/sdk/dist/cjs/**/*.js",
-      "node_modules/@modelcontextprotocol/sdk/dist/esm/**/*.js",
+      "node_modules/@modelcontextprotocol/sdk/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.js",
-      "node_modules/jenkins-mcp/**/*.js",
-      "node_modules/open/**/*.js"
+      "node_modules/jenkins-mcp/**/*.js"
     ],
     "assets": [
       "dist/skills/**/*",
-      "node_modules/@modelcontextprotocol/sdk/**/*.js",
-      "node_modules/@modelcontextprotocol/sdk/**/*.json",
       "node_modules/gitlab-core-mcp/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.json",
       "node_modules/jenkins-mcp/**/*.js",
