@@ -27,7 +27,12 @@ jobs:
       - run: npm run build
       - run: npx @yao-pkg/pkg dist/server.js -t ${{ matrix.target }} -o release/${{ matrix.output }} --compress Brotli --config package.json
       - name: Show compressed size
-        run: ls -lh release/${{ matrix.output }}
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            Get-Item release/${{ matrix.output }} | Select-Object Name, Length
+          else
+            ls -lh release/${{ matrix.output }}
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
