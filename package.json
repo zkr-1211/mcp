@@ -9,7 +9,7 @@
   "type": "module",
   "main": "dist/server.js",
   "bin": {
-    "postar-pipe-mcp": "dist/server.js"
+    "postar-pipe-mcp": "bin/postar-pipe-mcp.js"
   },
   "files": [
     "bin",
