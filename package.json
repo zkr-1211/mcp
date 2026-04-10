@@ -60,6 +60,7 @@
     "entry": "dist/server.js",
     "scripts": [
       "dist/**/*.js",
+      "node_modules/@modelcontextprotocol/sdk/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.js",
       "node_modules/jenkins-mcp/**/*.js"
     ],
