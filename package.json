@@ -39,7 +39,7 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "gitlab-core-mcp": "^6.62.1",
+    "@structured-world/gitlab-mcp": "^7.1.0",
     "jenkins-mcp": "^0.2.1",
     "js-yaml": "^4.1.0",
     "zod": "^3.23.8",
@@ -63,13 +63,13 @@
     "scripts": [
       "dist/**/*.js",
       "node_modules/@modelcontextprotocol/sdk/**/*.js",
-      "node_modules/gitlab-core-mcp/**/*.js",
+      "node_modules/@structured-world/gitlab-mcp/**/*.js",
       "node_modules/jenkins-mcp/**/*.js"
     ],
     "assets": [
       "dist/skills/**/*",
-      "node_modules/gitlab-core-mcp/**/*.js",
-      "node_modules/gitlab-core-mcp/**/*.json",
+      "node_modules/@structured-world/gitlab-mcp/**/*.js",
+      "node_modules/@structured-world/gitlab-mcp/**/*.json",
       "node_modules/jenkins-mcp/**/*.js",
       "node_modules/jenkins-mcp/**/*.json"
     ],
