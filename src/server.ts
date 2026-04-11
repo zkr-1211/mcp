@@ -28,7 +28,7 @@ async function createServer(): Promise<McpServer> {
   const skillsMetadata = await getAllSkillsMetadata();
   for (const metadata of skillsMetadata) {
     server.registerTool(
-      `${metadata.name}_execute`,
+      `${metadata.name}`,
       {
         description: metadata.description,
         inputSchema: {
