@@ -62,10 +62,28 @@ if (!existsSync(releaseDir)) {
   mkdirSync(releaseDir, { recursive: true });
 }
 
+// Windows 下清理可能残留的 ZIP 文件（上次安装失败留下的）
+if (isWindows && existsSync(zipPath)) {
+  try {
+    console.log('[postar-pipe-mcp] Cleaning up leftover ZIP file...');
+    unlinkSync(zipPath);
+  } catch (err) {
+    // 如果删除失败，说明文件被占用，尝试重命名
+    const backupPath = zipPath + '.old';
+    try {
+      renameSync(zipPath, backupPath);
+      console.log('[postar-pipe-mcp] Renamed old ZIP file');
+    } catch (err2) {
+      console.log('[postar-pipe-mcp] Warning: Could not clean up old ZIP file');
+    }
+  }
+}
+
 console.log(`[postar-pipe-mcp] Downloading ${binaryName}...`);
 
-// 尝试下载 ZIP（更小、保留权限）
+// 尝试下载
 // 优先级：OSS > GitHub 镜像 > GitHub 直链
+// Windows 下会延迟解压，避免与 npx 缓存清理冲突
 const downloadUrls = [
   // OSS 源（最快）
   ossZipUrl,
@@ -138,7 +156,15 @@ function download(url, dest, isZip = false, redirectCount = 0) {
       file.close(() => {
         // 如果是 ZIP，解压后删除
         if (isZip) {
-          extractZip(zipPath, destPath);
+          // Windows 下延迟解压，避免与 npx 缓存清理冲突
+          if (isWindows) {
+            console.log('[postar-pipe-mcp] Waiting 2s before extracting (avoiding cache conflicts)...');
+            setTimeout(() => {
+              extractZip(zipPath, destPath);
+            }, 2000);
+          } else {
+            extractZip(zipPath, destPath);
+          }
         } else {
           if (!isWindows) {
             chmodSync(dest, 0o755);
