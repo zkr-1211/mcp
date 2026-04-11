@@ -32,7 +32,7 @@ const version = pkgJson.version;
 // 需要下载的文件列表
 const files = [
   'postar-pipe-mcp-macos-arm64.zip',
-  'postar-pipe-mcp-win-x64.exe',
+  'postar-pipe-mcp-win-x64.zip',
 ];
 
 // ========================================
@@ -171,7 +171,6 @@ async function uploadToOSS() {
     console.error('手动上传命令示例:');
     console.log(`  ossutil cp ${releaseDir}/postar-pipe-mcp-macos-arm64.zip oss://vueh5/test/mcp/`);
     console.log(`  ossutil cp ${releaseDir}/postar-pipe-mcp-win-x64.zip oss://vueh5/test/mcp/`);
-    console.log(`  ossutil cp ${releaseDir}/postar-pipe-mcp-win-x64.exe oss://vueh5/test/mcp/`);
     process.exit(1);
   }
   

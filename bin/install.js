@@ -49,13 +49,9 @@ const releaseDir = join(__dirname, '..', 'release');
 const destPath = join(releaseDir, binaryName);
 const zipPath = join(releaseDir, zipName);
 
-// Windows 直接下载 exe,其他平台下载 zip
-const ossUrl = isWindows 
-  ? `${OSS_BASE_URL}/${binaryName}` 
-  : `${OSS_BASE_URL}/${zipName}`;
-const githubUrl = isWindows
-  ? `${GITHUB_BASE_URL}/v${version}/${binaryName}`
-  : `${GITHUB_BASE_URL}/v${version}/${zipName}`;
+// 所有平台都下载 zip,然后解压
+const ossUrl = `${OSS_BASE_URL}/${zipName}`;
+const githubUrl = `${GITHUB_BASE_URL}/v${version}/${zipName}`;
 
 if (existsSync(destPath)) {
   console.log(`[postar-pipe-mcp] Binary already exists: ${binaryName}`);
@@ -83,16 +79,16 @@ if (isWindows && existsSync(destPath)) {
   }
 }
 
-console.log(`[postar-pipe-mcp] Downloading ${binaryName}...`);
+console.log(`[postar-pipe-mcp] Downloading ${zipName}...`);
 
 // 尝试下载
 // 优先级:OSS > GitHub 镜像 > GitHub 直链
-// Windows 直接下载 exe,其他平台下载 zip 后解压
+// 所有平台都下载 zip,然后解压
 const downloadUrls = [
   // OSS 源(最快)
   ossUrl,
   // GitHub 镜像
-  ...MIRROR_URLS.map(m => `${m}/v${version}/${isWindows ? binaryName : zipName}`),
+  ...MIRROR_URLS.map(m => `${m}/v${version}/${zipName}`),
   // GitHub 直链
   githubUrl,
 ];
@@ -107,7 +103,7 @@ function tryDownload() {
   }
 
   const url = downloadUrls[currentUrlIndex];
-  const isZip = !isWindows && url.endsWith('.zip');
+  const isZip = url.endsWith('.zip');
   const targetPath = isZip ? zipPath : destPath;
   
   console.log(`[postar-pipe-mcp] Attempt ${currentUrlIndex + 1}/${downloadUrls.length}: ${url}`);
@@ -156,11 +152,10 @@ function download(url, dest, isZip = false, redirectCount = 0) {
     file.on('finish', () => {
       process.stdout.write('\n');
       file.close(() => {
-        // 非 Windows 平台下载的是 zip,需要解压
+        // 下载的是 zip,需要解压
         if (isZip) {
           extractZip(zipPath, destPath);
         } else {
-          // Windows 直接下载 exe,无需解压
           if (!isWindows) {
             chmodSync(dest, 0o755);
           }
