@@ -12,3 +12,5 @@ vite.config.ts
 tsconfig.json
 .gitignore
 .github/
+.env
+.env.example
