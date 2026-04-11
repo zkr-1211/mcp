@@ -73,9 +73,6 @@ jobs:
   publish:
     needs: release
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,4 +84,6 @@ jobs:
       - run: npm install --legacy-peer-deps
       - run: npm run build
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
