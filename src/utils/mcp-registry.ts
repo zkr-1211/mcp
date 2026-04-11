@@ -28,7 +28,7 @@ function parseJenkinsInstances(): JenkinsInstance[] {
 
   // 1. 检测默认 Jenkins 配置（无后缀）
   // URL 设置默认值，用户名和 Token 由外部配置
-  const defaultUrl = process.env.JENKINS_URL || 'http://10.169.140.235:30866';
+  const defaultUrl = process.env.JENKINS_URL;
   const defaultUser = process.env.JENKINS_USER;
   const defaultToken = process.env.JENKINS_TOKEN;
 
