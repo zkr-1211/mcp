@@ -100,10 +100,10 @@ function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
 
   if (gitlabToken) {
     const nodePath = process.execPath;
-    const gitlabPath = getPackageEntry('@structured-world/gitlab-mcp');
+    const gitlabPath = getPackageEntry('gitlab-core-mcp');
 
     if (!gitlabPath) {
-      console.error('[MCP-PIPE] 警告：@structured-world/gitlab-mcp 未安装，GitLab 功能不可用');
+      console.error('[MCP-PIPE] 警告：gitlab-core-mcp 未安装，GitLab 功能不可用');
       return;
     }
 
