@@ -4,8 +4,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { rmSync, existsSync, mkdirSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { tmpdir, platform } from 'os';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { initMCPClients } from './utils/mcp-registry.js';
 import { getProxiedTools, handleProxiedTool } from './utils/tool-proxy.js';
 import { getSkillContent, getAvailableSkills, getSkillMetadata, getAllSkillsMetadata, extractAllSkillResourcesToTempDir, getTempSkillDir, getSkillResourceFiles } from './utils/skill-loader.js';
@@ -187,6 +188,60 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('[MCP-PIPE] Server 已启动');
+
+  // 6. 输出二进制文件路径（方便一键复制）
+  try {
+    // 检测是否在 pkg 打包环境中
+    const isPkg = typeof (process as any).pkg !== 'undefined';
+    let binaryPath: string;
+    
+    if (isPkg) {
+      // pkg 打包环境：使用 process.execPath
+      binaryPath = process.execPath;
+    } else {
+      // 开发环境：根据当前平台动态选择二进制文件名
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      const isWindows = process.platform === 'win32';
+      const ext = isWindows ? '.exe' : '';
+      const binaryName = `postar-pipe-mcp-${isWindows ? 'win-x64' : 'macos-arm64'}${ext}`;
+      binaryPath = join(__dirname, '..', 'release', binaryName);
+    }
+    
+    console.error('');
+    console.error('═══════════════════════════════════════════════════════');
+    console.error('📦 二进制文件路径（已自动复制到剪贴板）:');
+    console.error(`   ${binaryPath}`);
+    
+    // 自动复制到剪贴板
+    const currentPlatform = platform();
+    if (currentPlatform === 'darwin') {
+      // macOS: 使用 pbcopy
+      try {
+        const { execSync } = await import('child_process');
+        // 使用 printf 避免 echo 的转义问题
+        execSync(`printf '%s' "${binaryPath}" | pbcopy`);
+        console.error('✅ 已复制到剪贴板，可直接粘贴 (Cmd+V)');
+      } catch {
+        console.error('💡 如未自动复制，请手动选中上方路径');
+      }
+    } else if (currentPlatform === 'win32') {
+      // Windows: 使用 clip
+      try {
+        const { execSync } = await import('child_process');
+        execSync(`echo ${binaryPath} | clip`);
+        console.error('✅ 已复制到剪贴板，可直接粘贴 (Ctrl+V)');
+      } catch {
+        console.error('💡 如未自动复制，请手动选中上方路径');
+      }
+    } else {
+      console.error('💡 路径已显示，请手动复制');
+    }
+    console.error('═══════════════════════════════════════════════════════');
+    console.error('');
+  } catch (error) {
+    console.error('[MCP-PIPE] 获取二进制路径失败:', error);
+  }
 }
 
 main().catch((error) => {
