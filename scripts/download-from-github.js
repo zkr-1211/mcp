@@ -51,6 +51,9 @@ const OSS_CONFIG = {
 // 是否需要自动上传到 OSS
 const AUTO_UPLOAD_TO_OSS = process.env.AUTO_UPLOAD_TO_OSS !== 'false';  // 默认 true
 
+// HTTP 代理配置（用于加速 GitHub 下载）
+const HTTP_PROXY = process.env.HTTP_PROXY ? process.env.HTTP_PROXY.replace(/\/$/, '') : null;  // 移除末尾的 /
+
 const releaseDir = join(__dirname, '..', 'release');
 
 // 验证 OSS 配置
@@ -97,7 +100,9 @@ files.forEach((filename, index) => {
 function downloadWithCurl(url, dest, filename) {
   try {
     // 使用 curl 下载，-L 跟随重定向，-# 显示进度条
-    execSync(`curl -L -# -o "${dest}" "${url}"`, {
+    // 如果配置了代理，使用代理加速下载
+    const proxyArg = HTTP_PROXY ? `-x "${HTTP_PROXY}"` : '';
+    execSync(`curl -L -# ${proxyArg} -o "${dest}" "${url}"`, {
       stdio: 'inherit',
       timeout: 300000 // 5分钟超时
     });

@@ -42,8 +42,9 @@ if (!currentPlatform) {
 }
 
 const isWindows = platform() === 'win32';
-const binaryName = `postar-pipe-mcp-${currentPlatform}-${currentArch}${isWindows ? '.exe' : ''}`;
-const zipName = `${binaryName}.zip`;
+const baseName = `postar-pipe-mcp-${currentPlatform}-${currentArch}`;
+const binaryName = `${baseName}${isWindows ? '.exe' : ''}`;
+const zipName = `${baseName}.zip`;
 
 const releaseDir = join(__dirname, '..', 'release');
 const destPath = join(releaseDir, binaryName);
