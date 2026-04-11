@@ -65,69 +65,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            release/*.zip
-            release/*.exe
-          body: |
-            ## 📦 安装方式
-            
-            ### 方式 1：通过 npm 安装（推荐 ✨）
-            ```bash
-            npm install postar-pipe-mcp
-            ```
-            自动下载并配置，无需手动处理权限问题。
-            
-            ### 方式 2：手动下载
-            
-            **macOS (Apple Silicon):**
-            ```bash
-            # 1. 下载 postar-pipe-mcp-macos-arm64.zip
-            # 2. 解压
-            unzip postar-pipe-mcp-macos-arm64.zip
-            
-            # 3. 添加执行权限（如需要）
-            chmod +x postar-pipe-mcp-macos-arm64
-            
-            # 4. 验证
-            ./postar-pipe-mcp-macos-arm64 --version
-            ```
-            
-            **Windows:**
-            ```powershell
-            # 1. 下载 postar-pipe-mcp-win-x64.zip
-            # 2. 解压
-            Expand-Archive postar-pipe-mcp-win-x64.zip
-            
-            # 3. 运行
-            .\postar-pipe-mcp-win-x64.exe --version
-            ```
-            
-            > ⚠️ **macOS 用户注意**
-            > 
-            > 如果提示"无法打开"或"Apple 无法检查恶意软件"，请：
-            > 1. 打开"系统偏好设置 > 安全性与隐私"
-            > 2. 点击"仍要打开"
-            > 3. 或在终端运行：`xattr -d com.apple.quarantine postar-pipe-mcp-macos-arm64`
-            
-            ## 🔧 配置 MCP Server
-            
-            在 `mcp.json` 中添加：
-            ```json
-            {
-              "mcpServers": {
-                "pipe-mcp": {
-                  "command": "npx",
-                  "args": ["postar-pipe-mcp"],
-                  "env": {
-                    "JENKINS_USER": "your_user",
-                    "JENKINS_TOKEN": "your_token",
-                    "GITLAB_TOKEN": "your_gitlab_token"
-                  }
-                }
-              }
-            }
-            ```
-          generate_release_notes: false
+          files: release/*
+          generate_release_notes: true
 
   publish:
     needs: release
