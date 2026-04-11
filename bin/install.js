@@ -45,6 +45,10 @@ const isWindows = platform() === 'win32';
 const binaryName = `postar-pipe-mcp-${currentPlatform}-${currentArch}${isWindows ? '.exe' : ''}`;
 const zipName = `${binaryName}.zip`;
 
+const releaseDir = join(__dirname, '..', 'release');
+const destPath = join(releaseDir, binaryName);
+const zipPath = join(releaseDir, zipName);
+
 // Windows 直接下载 exe,其他平台下载 zip
 const ossUrl = isWindows 
   ? `${OSS_BASE_URL}/${binaryName}` 
@@ -52,13 +56,6 @@ const ossUrl = isWindows
 const githubUrl = isWindows
   ? `${GITHUB_BASE_URL}/v${version}/${binaryName}`
   : `${GITHUB_BASE_URL}/v${version}/${zipName}`;
-
-// 下载目标文件路径
-const downloadPath = isWindows ? destPath : zipPath;
-
-const releaseDir = join(__dirname, '..', 'release');
-const destPath = join(releaseDir, binaryName);
-const zipPath = join(releaseDir, zipName);
 
 if (existsSync(destPath)) {
   console.log(`[postar-pipe-mcp] Binary already exists: ${binaryName}`);

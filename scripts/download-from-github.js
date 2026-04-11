@@ -72,13 +72,13 @@ if (!existsSync(releaseDir)) {
 
 // 清空 release 目录
 console.log(`[Clean] Clearing release directory: ${releaseDir}`);
-const { readdirSync, rmSync } = await import('fs/promises');
-const files$1 = readdirSync(releaseDir);
-for (const file of files$1) {
+const { readdir, rm } = await import('fs/promises');
+const existingFiles = await readdir(releaseDir);
+for (const file of existingFiles) {
   const filePath = join(releaseDir, file);
-  rmSync(filePath, { recursive: true, force: true });
+  await rm(filePath, { recursive: true, force: true });
 }
-console.log(`[✓] Cleared ${files$1.length} file(s)\n`);
+console.log(`[✓] Cleared ${existingFiles.length} file(s)\n`);
 
 console.log(`[Download] Downloading binaries from GitHub Release v${version}...\n`);
 
