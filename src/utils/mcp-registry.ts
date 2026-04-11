@@ -27,11 +27,13 @@ function parseJenkinsInstances(): JenkinsInstance[] {
   const instances: JenkinsInstance[] = [];
 
   // 1. 检测默认 Jenkins 配置（无后缀）
-  const defaultUrl = process.env.JENKINS_URL;
+  // URL 设置默认值，用户名和 Token 由外部配置
+  const defaultUrl = process.env.JENKINS_URL || 'http://10.169.140.235:30866';
   const defaultUser = process.env.JENKINS_USER;
   const defaultToken = process.env.JENKINS_TOKEN;
 
-  if (defaultUrl && defaultUser && defaultToken) {
+  // 只有用户名和 token 都配置了才注册
+  if (defaultUser && defaultToken) {
     instances.push({
       name: 'jenkins',
       url: defaultUrl,
@@ -92,8 +94,9 @@ function getPackageEntry(packageName: string): string | null {
  * 注册 GitLab MCP
  */
 function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
+  // 如果外部没有配置，使用默认值
   const gitlabToken = process.env.GITLAB_TOKEN;
-  const gitlabUrl = process.env.GITLAB_URL || 'https://gitlab.com';
+  const gitlabUrl = process.env.GITLAB_URL || 'http://192.168.162.164:9081';
 
   if (gitlabToken) {
     const nodePath = process.execPath;
@@ -113,7 +116,7 @@ function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
         GITLAB_TOKEN: gitlabToken,
       },
     });
-    console.error('[MCP-PIPE] GitLab MCP 已注册');
+    console.error(`[MCP-PIPE] GitLab MCP 已注册 (${gitlabUrl})`);
   } else {
     console.error('[MCP-PIPE] 警告：GITLAB_TOKEN 未设置，GitLab 功能不可用');
   }
