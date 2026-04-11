@@ -12,6 +12,7 @@ import { readFileSync } from 'fs';
 import OSS from 'ali-oss';
 import { config as loadEnv } from 'dotenv';
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -31,7 +32,7 @@ const version = pkgJson.version;
 // 需要下载的文件列表
 const files = [
   'postar-pipe-mcp-macos-arm64.zip',
-  'postar-pipe-mcp-win-x64.zip',
+  'postar-pipe-mcp-win-x64.exe',
 ];
 
 // ========================================
@@ -55,7 +56,7 @@ const releaseDir = join(__dirname, '..', 'release');
 // 验证 OSS 配置
 if (AUTO_UPLOAD_TO_OSS) {
   if (!OSS_CONFIG.accessKeyId || !OSS_CONFIG.accessKeySecret) {
-    console.warn('⚠️  OSS 配置未完成，请在 .env 文件中配置以下变量：');
+    console.warn('⚠️  OSS 配置未完成,请在 .env 文件中配置以下变量:');
     console.warn('   OSS_ACCESS_KEY_ID=你的AccessKey ID');
     console.warn('   OSS_ACCESS_KEY_SECRET=你的AccessKey Secret');
     console.warn('   OSS_REGION=oss-cn-hangzhou (可选)');
@@ -64,9 +65,20 @@ if (AUTO_UPLOAD_TO_OSS) {
   }
 }
 
+// 创建 release 目录(如果不存在)
 if (!existsSync(releaseDir)) {
   mkdirSync(releaseDir, { recursive: true });
 }
+
+// 清空 release 目录
+console.log(`[Clean] Clearing release directory: ${releaseDir}`);
+const { readdirSync, rmSync } = await import('fs/promises');
+const files$1 = readdirSync(releaseDir);
+for (const file of files$1) {
+  const filePath = join(releaseDir, file);
+  rmSync(filePath, { recursive: true, force: true });
+}
+console.log(`[✓] Cleared ${files$1.length} file(s)\n`);
 
 console.log(`[Download] Downloading binaries from GitHub Release v${version}...\n`);
 
@@ -76,21 +88,9 @@ let failed = 0;
 files.forEach((filename, index) => {
   const url = `${GITHUB_BASE_URL}/v${version}/${filename}`;
   const destPath = join(releaseDir, filename);
-  
+    
   console.log(`[${index + 1}/${files.length}] Downloading ${filename}...`);
-  
-  // 如果文件已存在，先删除（确保下载最新版本）
-  if (existsSync(destPath)) {
-    try {
-      const stats = statSync(destPath);
-      const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
-      console.log(`    Removing existing file (${sizeMB} MB)...`);
-      unlinkSync(destPath);
-    } catch (err) {
-      console.error(`    Warning: Failed to remove existing file: ${err.message}`);
-    }
-  }
-  
+    
   downloadWithCurl(url, destPath, filename);
 });
 
@@ -163,7 +163,7 @@ async function uploadToOSS() {
   
   // 检查 OSS 配置
   if (!OSS_CONFIG.accessKeyId || !OSS_CONFIG.accessKeySecret) {
-    console.error('❌ OSS 配置未完成，请在 .env 文件中配置：');
+    console.error('❌ OSS 配置未完成,请在 .env 文件中配置:');
     console.error('');
     console.error('   OSS_ACCESS_KEY_ID=你的AccessKey ID');
     console.error('   OSS_ACCESS_KEY_SECRET=你的AccessKey Secret');
@@ -171,6 +171,7 @@ async function uploadToOSS() {
     console.error('手动上传命令示例:');
     console.log(`  ossutil cp ${releaseDir}/postar-pipe-mcp-macos-arm64.zip oss://vueh5/test/mcp/`);
     console.log(`  ossutil cp ${releaseDir}/postar-pipe-mcp-win-x64.zip oss://vueh5/test/mcp/`);
+    console.log(`  ossutil cp ${releaseDir}/postar-pipe-mcp-win-x64.exe oss://vueh5/test/mcp/`);
     process.exit(1);
   }
   
@@ -181,14 +182,17 @@ async function uploadToOSS() {
       accessKeyId: OSS_CONFIG.accessKeyId,
       accessKeySecret: OSS_CONFIG.accessKeySecret,
       bucket: OSS_CONFIG.bucket,
-      // 使用自定义 endpoint（如果有）
+      // 使用自定义 endpoint(如果有)
       ...(OSS_CONFIG.endpoint && { endpoint: OSS_CONFIG.endpoint }),
     });
     
     let uploaded = 0;
     let uploadFailed = 0;
     
-    for (const filename of files) {
+    // 构建要上传的完整文件列表
+    const allFilesToUpload = [...files];
+    
+    for (const filename of allFilesToUpload) {
       const filePath = join(releaseDir, filename);
       
       if (!existsSync(filePath)) {
@@ -223,6 +227,14 @@ async function uploadToOSS() {
     
     console.log('\n========================================');
     console.log(`Upload complete: ${uploaded} succeeded, ${uploadFailed} failed`);
+    console.log('Uploaded files:');
+    allFilesToUpload.forEach(f => {
+      if (existsSync(join(releaseDir, f))) {
+        const stats = statSync(join(releaseDir, f));
+        const size = (stats.size / 1024 / 1024).toFixed(2);
+        console.log(`  ✓ ${f} (${size} MB)`);
+      }
+    });
     console.log('========================================');
     
     if (uploadFailed > 0) {
