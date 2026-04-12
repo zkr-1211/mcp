@@ -11,6 +11,7 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import OSS from 'ali-oss';
 import { config as loadEnv } from 'dotenv';
+import { RELEASE_FILES, GITHUB_REPO } from './config.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,17 +24,13 @@ if (existsSync(envPath)) {
   console.log('[Config] Loaded .env file\n');
 }
 
-const GITHUB_REPO = 'zkr-1211/mcp';
 const GITHUB_BASE_URL = `https://github.com/${GITHUB_REPO}/releases/download`;
 
 const pkgJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 const version = pkgJson.version;
 
-// 需要下载的文件列表
-const files = [
-  'postar-pipe-mcp-macos-arm64.zip',
-  'postar-pipe-mcp-win-x64.zip',
-];
+// 需要下载的文件列表（从共享配置读取）
+const files = RELEASE_FILES;
 
 // ========================================
 // OSS 配置（从环境变量读取）
