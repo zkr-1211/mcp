@@ -37,6 +37,7 @@ console.log(`   超时时间: ${MAX_POLL_TIME / 60000}分钟\n`);
 
 const startTime = Date.now();
 let lastStatus = '';
+let firstWorkflowFound = false; // 标记是否找到了新的 workflow
 
 /**
  * 获取 Release 信息
@@ -72,7 +73,7 @@ async function getRelease() {
 async function getLatestWorkflowRun() {
   try {
     const response = await fetch(
-      `${GITHUB_API}/actions/runs?event=push&per_page=1`,
+      `${GITHUB_API}/actions/runs?event=push&per_page=5`,
       {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
@@ -89,7 +90,26 @@ async function getLatestWorkflowRun() {
 
     const data = await response.json();
     if (data.workflow_runs && data.workflow_runs.length > 0) {
-      return data.workflow_runs[0];
+      // 优先匹配当前版本号（精确匹配）
+      const matchingWorkflow = data.workflow_runs.find(run => 
+        run.head_branch === version || // 1.4.2
+        run.head_branch === tagName ||  // v1.4.2
+        run.head_branch === `refs/tags/${tagName}` // refs/tags/v1.4.2
+      );
+      
+      if (matchingWorkflow) {
+        firstWorkflowFound = true;
+        console.log(`   ↳ 找到匹配的 workflow: ${matchingWorkflow.head_branch} (${matchingWorkflow.status})`);
+        return matchingWorkflow;
+      }
+      
+      // 如果还没找到新的 workflow，且第一条是 completed 状态，说明是旧的
+      const latest = data.workflow_runs[0];
+      if (!firstWorkflowFound && latest.status === 'completed') {
+        return null; // 返回 null，继续等待新的 workflow
+      }
+      
+      return latest;
     }
     return null;
   } catch (error) {
