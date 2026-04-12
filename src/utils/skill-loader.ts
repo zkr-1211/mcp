@@ -420,6 +420,7 @@ async function fetchRemoteSkillsList(config: SkillsConfig): Promise<string[]> {
 /**
  * 从远程加载 skill 内容
  * 支持 GitLab Private Token 认证
+ * 失败时自动降级到本地文件
  */
 async function loadRemoteSkillContent(skillName: string, baseUrl: string): Promise<string> {
   const skillUrl = `${baseUrl}/${skillName}/SKILL.md`;
@@ -450,8 +451,9 @@ async function loadRemoteSkillContent(skillName: string, baseUrl: string): Promi
     
     return content;
   } catch (error: any) {
-    console.error(`[SKILL-LOADER] 加载远程 skill 失败: ${skillUrl}`, error.message);
-    return `# ${skillName.toUpperCase()} Skill\n\nSkill 文件加载失败: ${error.message}`;
+    console.error(`[SKILL-LOADER] 远程加载失败: ${skillUrl}, 降级到本地: ${error.message}`);
+    // 降级到本地加载
+    return loadLocalSkillContent(skillName);
   }
 }
 
@@ -540,9 +542,24 @@ export async function getAvailableSkills(): Promise<string[]> {
 }
 
 /**
+ * 从本地加载 skill 内容
+ */
+function loadLocalSkillContent(skillName: string): string {
+  const skillPath = resolve(getSkillsDir(), skillName, 'SKILL.md');
+
+  try {
+    return readFileSync(skillPath, 'utf-8');
+  } catch (error: any) {
+    console.error(`[SKILL-LOADER] 本地加载也失败: ${skillPath}, ${error.message}`);
+    return `# ${skillName.toUpperCase()} Skill\n\n⚠️ Skill 文件加载失败(远程和本地均不可用),请检查安装。`;
+  }
+}
+
+/**
  * 加载 skill 文件内容
  * 支持本地和远程两种模式
- * 远程模式下支持多源：根据 skill 名称从对应的源加载
+ * 远程模式下支持多源:根据 skill 名称从对应的源加载
+ * 远程失败时自动降级到本地
  */
 async function loadSkillContent(skillName: string): Promise<string> {
   const config = getSkillsConfig();
@@ -555,10 +572,10 @@ async function loadSkillContent(skillName: string): Promise<string> {
       return loadRemoteSkillContent(skillName, source.baseUrl);
     }
 
-    // 如果没有找到映射（可能是手动指定的 skill），尝试从第一个源加载
+    // 如果没有找到映射(可能是手动指定的 skill),尝试从第一个源加载
     if (config.sources && config.sources.length > 0) {
       const firstSource = config.sources[0];
-      console.error(`[SKILL-LOADER] 未找到来源映射，使用默认源 ${firstSource.name} 加载: ${skillName}`);
+      console.error(`[SKILL-LOADER] 未找到来源映射,使用默认源 ${firstSource.name} 加载: ${skillName}`);
       return loadRemoteSkillContent(skillName, firstSource.baseUrl);
     }
 
@@ -569,13 +586,7 @@ async function loadSkillContent(skillName: string): Promise<string> {
   }
 
   // 本地模式
-  const skillPath = resolve(getSkillsDir(), skillName, 'SKILL.md');
-
-  try {
-    return readFileSync(skillPath, 'utf-8');
-  } catch (error) {
-    return `# ${skillName.toUpperCase()} Skill\n\nSkill 文件加载失败，请检查安装。`;
-  }
+  return loadLocalSkillContent(skillName);
 }
 
 /**
