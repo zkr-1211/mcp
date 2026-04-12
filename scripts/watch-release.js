@@ -132,6 +132,18 @@ async function poll() {
     process.exit(1);
   }
 
+  // 显示等待时间
+  const elapsedSec = Math.floor(elapsed / 1000);
+  const remainingSec = Math.floor((MAX_POLL_TIME - elapsed) / 1000);
+  
+  // 格式化时间显示
+  const formatTime = (seconds) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${mins}分${secs}秒` : `${mins}分钟`;
+  };
+
   try {
     // 1. 检查最新 workflow 状态
     const workflow = await getLatestWorkflowRun();
@@ -141,6 +153,8 @@ async function poll() {
       if (status !== lastStatus) {
         console.log(status);
         lastStatus = status;
+      } else {
+        process.stdout.write(`\r⏳ 等待 workflow 启动... (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})`);
       }
       setTimeout(poll, POLL_INTERVAL);
       return;
@@ -160,8 +174,10 @@ async function poll() {
     const status = `${statusText}${conclusionText} - ${workflow.name || 'Build'}`;
 
     if (status !== lastStatus) {
-      console.log(status);
+      console.log(`\n${status}`);
       lastStatus = status;
+    } else {
+      process.stdout.write(`\r${status} (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})`);
     }
 
     // 2. 判断 workflow 状态
@@ -173,7 +189,7 @@ async function poll() {
 
     if (workflow.status === 'completed' && workflow.conclusion === 'success') {
       // 构建成功，检查 Release 文件
-      console.log('\n✅ Workflow 构建成功！');
+      console.log('\n\n✅ Workflow 构建成功！');
       console.log('🔍 检查 Release 文件...');
 
       const release = await getRelease();
@@ -204,7 +220,7 @@ async function poll() {
 
     // workflow 失败或取消
     if (workflow.status === 'completed' && workflow.conclusion !== 'success') {
-      console.error(`\n❌ Workflow ${workflow.conclusion || '失败'}`);
+      console.error(`\n\n❌ Workflow ${workflow.conclusion || '失败'}`);
       console.error(`   查看日志: ${workflow.html_url}`);
       process.exit(1);
     }
@@ -212,7 +228,7 @@ async function poll() {
     // 其他状态，继续等待
     setTimeout(poll, POLL_INTERVAL);
   } catch (error) {
-    console.error(`⚠️  轮询异常: ${error.message}`);
+    console.error(`\n⚠️  轮询异常: ${error.message}`);
     setTimeout(poll, POLL_INTERVAL);
   }
 }
