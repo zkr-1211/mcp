@@ -5,13 +5,21 @@
  */
 
 import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { RELEASE_FILES, GITHUB_REPO } from './config.js';
+import { config as loadEnv } from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// 加载 .env 文件
+const envPath = join(__dirname, '..', '.env');
+if (existsSync(envPath)) {
+  loadEnv({ path: envPath });
+  console.error('[Config] Loaded .env file');
+}
 
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}`;
 
@@ -20,7 +28,7 @@ const version = pkgJson.version;
 const tagName = `v${version}`;
 
 // 轮询配置
-const POLL_INTERVAL = 5000; // 5 秒
+const POLL_INTERVAL = 15000; // 15 秒（避免触发 GitHub API 速率限制）
 const MAX_POLL_TIME = 30 * 60 * 1000; // 30 分钟超时（构建可能需要较长时间）
 
 console.log(`👀 开始监听 GitHub Release: ${tagName}`);
@@ -38,7 +46,8 @@ async function getRelease() {
     const response = await fetch(`${GITHUB_API}/releases/tags/${tagName}`, {
       headers: {
         'Accept': 'application/vnd.github.v3+json',
-        ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` }),
+        // 支持多种环境变量名
+        ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
       },
     });
 
@@ -67,7 +76,9 @@ async function getLatestWorkflowRun() {
       {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
+          // 支持多种环境变量名
           ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` }),
+          ...(process.env.GitHub_token && { 'Authorization': `token ${process.env.GitHub_token}` }),
         },
       }
     );
