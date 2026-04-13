@@ -52,14 +52,24 @@ jobs:
       - name: Package binaries with permissions
         run: |
           cd release
-          # macOS 文件
+          # MACOS ARM64
           if [ -f postar-pipe-mcp-macos-arm64 ]; then
             chmod +x postar-pipe-mcp-macos-arm64
             zip postar-pipe-mcp-macos-arm64.zip postar-pipe-mcp-macos-arm64
           fi
-          # Windows 文件
+          # MACOS X64
+          if [ -f postar-pipe-mcp-macos-x64 ]; then
+            chmod +x postar-pipe-mcp-macos-x64
+            zip postar-pipe-mcp-macos-x64.zip postar-pipe-mcp-macos-x64
+          fi
+          # WIN X64
           if [ -f postar-pipe-mcp-win-x64.exe ]; then
             zip postar-pipe-mcp-win-x64.zip postar-pipe-mcp-win-x64.exe
+          fi
+          # LINUX X64
+          if [ -f postar-pipe-mcp-linux-x64 ]; then
+            chmod +x postar-pipe-mcp-linux-x64
+            zip postar-pipe-mcp-linux-x64.zip postar-pipe-mcp-linux-x64
           fi
           ls -la
       - name: Create GitHub Release

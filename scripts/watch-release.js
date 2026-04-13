@@ -174,7 +174,7 @@ async function poll() {
         console.log(status);
         lastStatus = status;
       } else {
-        process.stdout.write(`\r⏳ 等待 workflow 启动... (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})`);
+        process.stdout.write(`\r⏳ 等待 workflow 启动... (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})` + ' '.repeat(20));
       }
       setTimeout(poll, POLL_INTERVAL);
       return;
@@ -197,7 +197,7 @@ async function poll() {
       console.log(`\n${status}`);
       lastStatus = status;
     } else {
-      process.stdout.write(`\r${status} (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})`);
+      process.stdout.write(`\r${status} (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})` + ' '.repeat(20));
     }
 
     // 2. 判断 workflow 状态

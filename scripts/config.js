@@ -31,14 +31,6 @@ const __dirname = dirname(__filename);
 
 try {
   const pkgJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
-  const pkgTargets = pkgJson.pkg?.targets || [];
-  
-  if (JSON.stringify(PKG_TARGETS) !== JSON.stringify(pkgTargets)) {
-    console.warn('⚠️  配置不同步！');
-    console.warn('   config.js:', JSON.stringify(PKG_TARGETS));
-    console.warn('   package.json:', JSON.stringify(pkgTargets));
-    console.warn('   请运行: node -e "import(\'./scripts/config.js\').then(c => { require(\'fs\').writeFileSync(\'package.json\', JSON.stringify({...JSON.parse(require(\'fs\').readFileSync(\'package.json\', \'utf-8\')), pkg: {...JSON.parse(require(\'fs\').readFileSync(\'package.json\', \'utf-8\')).pkg, targets: c.PKG_TARGETS}}, null, 2) + \'\\n\') })"');
-  }
 } catch (error) {
   // 忽略验证错误（可能在某些环境下 package.json 不存在）
 }
