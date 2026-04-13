@@ -1,11 +1,9 @@
 name: Build Multi-Platform Binaries
-
-on:
+'on':
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
-
+      - v*
+  workflow_dispatch: null
 jobs:
   build:
     strategy:
@@ -14,9 +12,15 @@ jobs:
           - os: macos-latest
             target: node24-macos-arm64
             output: postar-pipe-mcp-macos-arm64
+          - os: macos-latest
+            target: node24-macos-x64
+            output: postar-pipe-mcp-macos-x64
           - os: windows-latest
             target: node24-win-x64
             output: postar-pipe-mcp-win-x64.exe
+          - os: ubuntu-latest
+            target: node24-linux-x64
+            output: postar-pipe-mcp-linux-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +34,6 @@ jobs:
         with:
           name: ${{ matrix.output }}
           path: release/${{ matrix.output }}
-
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -46,8 +49,6 @@ jobs:
           path: release
           merge-multiple: true
       - run: ls -la release/
-      
-      # 打包为 zip 保留执行权限
       - name: Package binaries with permissions
         run: |
           cd release
@@ -61,13 +62,11 @@ jobs:
             zip postar-pipe-mcp-win-x64.zip postar-pipe-mcp-win-x64.exe
           fi
           ls -la
-      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: release/*
           generate_release_notes: true
-
   publish:
     needs: release
     runs-on: ubuntu-latest
@@ -78,7 +77,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: https://registry.npmjs.org
       - run: npm install --legacy-peer-deps
       - run: npm run build
       - name: Publish to npm
