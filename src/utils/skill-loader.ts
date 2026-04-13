@@ -6,6 +6,7 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, readdirSync, existsSync, statSync, mkdirSync, copyFileSync, writeFileSync } from 'fs';
 import * as yaml from 'js-yaml';
+import { parseGitLabUrl } from './gitlab-utils.js';
 
 // 缓存 skill 内容(带时间戳)
 interface CacheEntry<T> {
@@ -181,66 +182,6 @@ function getSkillsConfig(): SkillsConfig {
   return {
     source: 'local',
   };
-}
-
-/**
- * 解析 GitLab URL
- * 从 tree URL 中提取项目路径、分支和目录路径
- * 
- * URL 格式: http(s)://host/namespace/project/tree/ref/path
- * 问题: ref 可能包含 / (如 feature/2026),路径也可能包含 /
- * 
- * 解决策略:使用 GitLab API 尝试不同的 ref/path 分割点
- */
-async function parseGitLabUrl(treeUrl: string): Promise<{ host: string; projectPath: string; ref: string; path: string } | null> {
-  // 匹配: http(s)://host/namespace/project/tree/ref/path
-  const match = treeUrl.match(/^(https?:\/\/[^\/]+)\/(.+)\/tree\/(.+)$/);
-  if (!match) {
-    return null;
-  }
-  
-  const [, host, projectPath, refAndPath] = match;
-  const gitlabToken = process.env.GITLAB_TOKEN;
-  
-  // 尝试不同的分割点,找到正确的 ref
-  const parts = refAndPath.split('/');
-  
-  for (let i = 1; i < parts.length; i++) {
-    const ref = parts.slice(0, i).join('/');
-    const path = parts.slice(i).join('/');
-    
-    // 构建 API URL 测试
-    const encodedProjectPath = encodeURIComponent(projectPath);
-    const testUrl = `${host}/api/v4/projects/${encodedProjectPath}/repository/tree?ref=${encodeURIComponent(ref)}&path=${encodeURIComponent(path)}&per_page=1`;
-    
-    try {
-      const headers: Record<string, string> = {};
-      if (gitlabToken) {
-        headers['PRIVATE-TOKEN'] = gitlabToken;
-      }
-      
-      const response = await fetch(testUrl, { headers });
-      
-      if (response.ok) {
-        // 找到了正确的分割点
-        return { host, projectPath, ref, path };
-      }
-    } catch {
-      // 继续尝试下一个分割点
-    }
-  }
-  
-  // 如果都失败了,返回默认分割(第一部分是 ref,其余是 path)
-  if (parts.length >= 2) {
-    return {
-      host,
-      projectPath,
-      ref: parts[0],
-      path: parts.slice(1).join('/')
-    };
-  }
-  
-  return null;
 }
 
 /**

@@ -3,9 +3,219 @@
  */
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { getMCPClientManager } from './mcp-client.js';
+import { parseGitLabUrl, buildGitLabHeaders } from './gitlab-utils.js';
 
 // 固定的 GitLab 前缀
 const GITLAB_PREFIX = 'mcp_gitlab_';
+
+/**
+ * 简单的 YAML 解析器（只支持我们需要的配置格式）
+ * 避免 pkg 打包后的 js-yaml 动态 import 问题
+ */
+function parseSimpleYaml(content: string): MCPToolsConfig {
+  const config: MCPToolsConfig = {};
+  const lines = content.split('\n');
+  let currentSection: string | null = null;
+  let currentArray: string | null = null;
+
+  for (const line of lines) {
+    // 去掉行内注释
+    let cleanLine = line;
+    const commentIndex = line.indexOf('#');
+    if (commentIndex > 0) {
+      cleanLine = line.substring(0, commentIndex);
+    }
+    
+    const trimmed = cleanLine.trim();
+    
+    // 跳过空行
+    if (!trimmed) continue;
+
+    // 检测顶级配置 (gitlab:, jenkins:, jenkins-prod:)
+    const sectionMatch = trimmed.match(/^(gitlab|jenkins(?:-[a-z0-9-]+)?):$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1];
+      config[currentSection] = {};
+      currentArray = null;
+      continue;
+    }
+
+    // 检测数组项 (- item)
+    if (currentSection && trimmed.startsWith('- ')) {
+      const item = trimmed.slice(2).trim();
+      if (item && currentArray && config[currentSection]) {
+        if (!config[currentSection][currentArray]) {
+          config[currentSection][currentArray] = [];
+        }
+        config[currentSection][currentArray].push(item);
+      }
+      continue;
+    }
+
+    // 检测数组键 (enabled:, disabled:)
+    if (currentSection && (trimmed === 'enabled:' || trimmed === 'disabled:')) {
+      currentArray = trimmed.slice(0, -1); // 去掉冒号
+      if (!config[currentSection][currentArray]) {
+        config[currentSection][currentArray] = [];
+      }
+      continue;
+    }
+  }
+
+  return config;
+}
+
+/**
+ * MCP 工具配置接口
+ */
+interface MCPToolsConfig {
+  gitlab?: {
+    enabled?: string[];    // 白名单
+    disabled?: string[];   // 黑名单
+  };
+  jenkins?: {
+    enabled?: string[];
+    disabled?: string[];
+  };
+  [key: string]: any;  // 支持其他自定义配置
+}
+
+/**
+ * 从 GitLab 远程加载工具配置
+ * 支持两种 URL 格式:
+ * 1. GitLab API 格式: http://host/api/v4/projects/{path}/repository/files/{file}/raw?ref={ref}
+ * 2. Web URL 格式: http://host/namespace/project/raw/ref/path/to/file (自动转换为 API)
+ */
+async function fetchRemoteToolsConfig(configUrl: string): Promise<MCPToolsConfig | null> {
+  try {
+    console.error(`[MCP-PIPE] 从远程加载工具配置: ${configUrl}`);
+
+    let apiUrl = configUrl;
+
+    // 如果是 Web URL，转换为 GitLab API
+    if (!configUrl.includes('/api/v4/')) {
+      console.error(`[MCP-PIPE] 解析 Web URL: ${configUrl}`);
+      
+      const parsed = await parseGitLabUrl(configUrl, 'raw');
+      if (!parsed) {
+        throw new Error('无法解析 URL 格式，请使用 GitLab Raw URL');
+      }
+      
+      const { host, projectPath, ref, path: filePath } = parsed;
+      const encodedProjectPath = encodeURIComponent(projectPath);
+      apiUrl = `${host}/api/v4/projects/${encodedProjectPath}/repository/files/${encodeURIComponent(filePath)}/raw?ref=${encodeURIComponent(ref)}`;
+      console.error(`[MCP-PIPE] 转换为 GitLab API: ${apiUrl}`);
+    }
+
+    // 构建请求头
+    const headers = buildGitLabHeaders({
+      'Accept': 'text/yaml, text/plain, */*',
+    });
+
+    if (process.env.GITLAB_TOKEN) {
+      console.error(`[MCP-PIPE] 使用 GitLab Token 认证`);
+    } else {
+      console.error(`[MCP-PIPE] 警告: 未配置 GITLAB_TOKEN，可能无法访问私有仓库`);
+    }
+
+    const response = await fetch(apiUrl, { headers });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText.substring(0, 200)}`);
+    }
+
+    const content = await response.text();
+
+    // 检查是否返回了 HTML 页面
+    if (content.trim().startsWith('<!DOCTYPE') || content.trim().startsWith('<html')) {
+      throw new Error('返回了 HTML 页面，请检查 URL 是否正确或 GITLAB_TOKEN 是否有效');
+    }
+
+    // 简单解析 YAML（避免 pkg 打包后的动态 import 问题）
+    const config = parseSimpleYaml(content);
+
+    console.error(`[MCP-PIPE] 远程工具配置加载成功`);
+    return config;
+  } catch (error: any) {
+    console.error(`[MCP-PIPE] 远程工具配置加载失败: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * 获取工具配置（支持远程 + 本地覆盖）
+ * 优先级：远程配置 > 本地环境变量 > 默认（全部启用）
+ * 注意：不缓存，每次启动都重新拉取
+ */
+async function getToolsConfig(): Promise<MCPToolsConfig> {
+  let config: MCPToolsConfig = {};
+
+  // 1. 尝试从远程加载
+  const remoteConfigUrl = process.env.MCP_TOOLS_CONFIG_URL;
+  if (remoteConfigUrl) {
+    console.error(`[MCP-PIPE] 📡 尝试从远程加载配置: ${remoteConfigUrl}`);
+    const remoteConfig = await fetchRemoteToolsConfig(remoteConfigUrl);
+    if (remoteConfig) {
+      config = remoteConfig;
+      console.error(`[MCP-PIPE] ✅ 使用远程工具配置`);
+      console.error(`[MCP-PIPE]    GitLab 启用: ${config.gitlab?.enabled?.length || 0} 个`);
+      console.error(`[MCP-PIPE]    GitLab 禁用: ${config.gitlab?.disabled?.length || 0} 个`);
+      console.error(`[MCP-PIPE]    Jenkins 启用: ${config.jenkins?.enabled?.length || 0} 个`);
+      console.error(`[MCP-PIPE]    Jenkins 禁用: ${config.jenkins?.disabled?.length || 0} 个`);
+    } else {
+      console.error(`[MCP-PIPE] ⚠️  远程配置加载失败，使用默认配置（全部启用）`);
+    }
+  } else {
+    console.error(`[MCP-PIPE] ⚠️  未配置 MCP_TOOLS_CONFIG_URL，使用默认配置`);
+  }
+
+  // 2. 本地环境变量覆盖（优先级更高）
+  const gitlabTools = process.env.GITLAB_TOOLS;
+  if (gitlabTools) {
+    config.gitlab = {
+      ...config.gitlab,
+      enabled: gitlabTools.split(',').map(s => s.trim()).filter(s => s),
+    };
+    console.error(`[MCP-PIPE] 使用环境变量覆盖 GitLab 工具: ${gitlabTools}`);
+  }
+
+  const jenkinsTools = process.env.JENKINS_TOOLS;
+  if (jenkinsTools) {
+    config.jenkins = {
+      ...config.jenkins,
+      enabled: jenkinsTools.split(',').map(s => s.trim()).filter(s => s),
+    };
+    console.error(`[MCP-PIPE] 使用环境变量覆盖 Jenkins 工具: ${jenkinsTools}`);
+  }
+
+  return config;
+}
+
+/**
+ * 检查工具是否应该启用
+ */
+function isToolEnabled(serverName: string, toolName: string, config: MCPToolsConfig): boolean {
+  // 获取服务器对应的配置键
+  const configKey = serverName.startsWith('jenkins') ? 'jenkins' : serverName;
+  const serverConfig = config[configKey];
+
+  if (!serverConfig) {
+    return true; // 没有配置，默认启用
+  }
+
+  // 检查黑名单
+  if (serverConfig.disabled && serverConfig.disabled.includes(toolName)) {
+    return false;
+  }
+
+  // 检查白名单
+  if (serverConfig.enabled && serverConfig.enabled.length > 0) {
+    return serverConfig.enabled.includes(toolName);
+  }
+
+  return true;
+}
 
 /**
  * 获取所有已注册的 MCP 服务器名称
@@ -106,8 +316,16 @@ export async function getProxiedTools(): Promise<Tool[]> {
     if (isFirstJenkins) {
       try {
         const tools = await manager.listTools(serverName);
+        const toolsConfig = await getToolsConfig();
+        let enabledCount = 0;
         
         for (const tool of tools.tools || []) {
+          // 检查工具是否启用
+          if (!isToolEnabled(serverName, tool.name, toolsConfig)) {
+            console.error(`[MCP-PIPE] 跳过禁用的工具: ${serverName}/${tool.name}`);
+            continue;
+          }
+          
           const proxiedToolName = `${prefix}${tool.name}`;
           const proxiedTool: Tool = {
             ...tool,
@@ -116,9 +334,10 @@ export async function getProxiedTools(): Promise<Tool[]> {
           };
           allTools.push(proxiedTool);
           toolSchemaCache.set(proxiedToolName, tool.inputSchema);
+          enabledCount++;
         }
         
-        console.error(`[MCP-PIPE] 已从 ${serverName} 获取 ${tools.tools?.length || 0} 个工具`);
+        console.error(`[MCP-PIPE] ✅ ${serverName}: 原始 ${tools.tools?.length || 0} 个工具，过滤后保留 ${enabledCount} 个`);
         isFirstJenkins = false;
       } catch (error) {
         console.error(`[MCP-PIPE] 无法从 ${serverName} 获取工具列表:`, error);
@@ -150,8 +369,16 @@ export async function getProxiedTools(): Promise<Tool[]> {
     const prefix = getToolPrefix(serverName);
     try {
       const tools = await manager.listTools(serverName);
+      const toolsConfig = await getToolsConfig();
+      let enabledCount = 0;
 
       for (const tool of tools.tools || []) {
+        // 检查工具是否启用
+        if (!isToolEnabled(serverName, tool.name, toolsConfig)) {
+          console.error(`[MCP-PIPE] 跳过禁用的工具: ${serverName}/${tool.name}`);
+          continue;
+        }
+        
         const proxiedToolName = `${prefix}${tool.name}`;
         const proxiedTool: Tool = {
           ...tool,
@@ -162,9 +389,10 @@ export async function getProxiedTools(): Promise<Tool[]> {
         
         // 缓存工具 schema
         toolSchemaCache.set(proxiedToolName, tool.inputSchema);
+        enabledCount++;
       }
 
-      console.error(`[MCP-PIPE] 已代理 ${serverName} 的 ${tools.tools?.length || 0} 个工具`);
+      console.error(`[MCP-PIPE] ✅ ${serverName}: 原始 ${tools.tools?.length || 0} 个工具，过滤后保留 ${enabledCount} 个`);
     } catch (error) {
       console.error(`[MCP-PIPE] 无法获取 ${serverName} 的工具列表:`, error);
     }
