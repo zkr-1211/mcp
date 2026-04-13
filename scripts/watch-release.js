@@ -98,8 +98,10 @@ async function getLatestWorkflowRun() {
       );
       
       if (matchingWorkflow) {
-        firstWorkflowFound = true;
-        console.log(`   ↳ 找到匹配的 workflow: ${matchingWorkflow.head_branch} (${matchingWorkflow.status})`);
+        if (!firstWorkflowFound) {
+          firstWorkflowFound = true;
+          console.log(`   ↳ 找到匹配的 workflow: ${matchingWorkflow.head_branch} (${matchingWorkflow.status})`);
+        }
         return matchingWorkflow;
       }
       
@@ -123,7 +125,7 @@ async function getLatestWorkflowRun() {
  */
 function triggerUpload() {
   console.log('\n✅ GitHub Release 构建完成！');
-  console.log('🚀 开始上传到 OSS...\n');
+  console.log('🚀 开始下载Release文件并上传到 OSS...\n');
 
   try {
     execSync('node scripts/download-from-github.js', {
@@ -173,9 +175,8 @@ async function poll() {
       if (status !== lastStatus) {
         console.log(status);
         lastStatus = status;
-      } else {
-        process.stdout.write(`\r⏳ 等待 workflow 启动... (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})` + ' '.repeat(20));
       }
+      // 非交互式终端不输出倒计时（避免刷屏）
       setTimeout(poll, POLL_INTERVAL);
       return;
     }
@@ -194,11 +195,10 @@ async function poll() {
     const status = `${statusText}${conclusionText} - ${workflow.name || 'Build'}`;
 
     if (status !== lastStatus) {
-      console.log(`\n${status}`);
+      console.log(`${status}`);
       lastStatus = status;
-    } else {
-      process.stdout.write(`\r${status} (已等待 ${formatTime(elapsedSec)} / 剩余 ${formatTime(remainingSec)})` + ' '.repeat(20));
     }
+    // 非交互式终端不输出倒计时（避免刷屏）
 
     // 2. 判断 workflow 状态
     if (workflow.status === 'queued' || workflow.status === 'in_progress') {
