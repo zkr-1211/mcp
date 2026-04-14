@@ -85,19 +85,60 @@ console.log(`[Download] Downloading binaries from GitHub Release v${version}...\
 let completed = 0;
 let failed = 0;
 
-files.forEach((filename, index) => {
-  const url = `${GITHUB_BASE_URL}/v${version}/${filename}`;
-  const destPath = join(releaseDir, filename);
+// 最大重试次数
+const MAX_RETRY = 3;
+
+// 下载队列（支持重试）
+const downloadQueue = files.map((filename, index) => ({
+  filename,
+  index,
+  retries: 0,
+  url: `${GITHUB_BASE_URL}/v${version}/${filename}`,
+  destPath: join(releaseDir, filename),
+}));
+
+// 串行下载（避免并发竞争）
+async function processDownloadQueue() {
+  for (const task of downloadQueue) {
+    await downloadWithRetry(task);
+  }
+  printSummary();
+}
+
+async function downloadWithRetry(task) {
+  const { filename, index, url, destPath } = task;
+  
+  while (task.retries <= MAX_RETRY) {
+    const attemptText = task.retries === 0 
+      ? `[${index + 1}/${files.length}]` 
+      : `[${index + 1}/${files.length}] Retry #${task.retries}`;
     
-  console.log(`[${index + 1}/${files.length}] Downloading ${filename}...`);
+    console.log(`${attemptText} Downloading ${filename}...`);
     
-  downloadWithCurl(url, destPath, filename);
-});
+    const success = downloadWithCurl(url, destPath, filename);
+    
+    if (success) {
+      completed++;
+      return;
+    }
+    
+    task.retries++;
+    
+    if (task.retries <= MAX_RETRY) {
+      console.log(`[!] ${filename} will retry in 2 seconds... (${task.retries}/${MAX_RETRY})\n`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  
+  // 所有重试都失败了
+  console.error(`[✗] ${filename} failed after ${MAX_RETRY} retries`);
+  failed++;
+}
 
 function downloadWithCurl(url, dest, filename) {
   try {
-    // 使用 curl 下载，-L 跟随重定向，-# 显示进度条
-    // 如果配置了代理，使用代理加速下载
+    // 使用 curl 下载,-L 跟随重定向,-# 显示进度条
+    // 如果配置了代理,使用代理加速下载
     const proxyArg = HTTP_PROXY ? `-x "${HTTP_PROXY}"` : '';
     execSync(`curl -L -# ${proxyArg} -o "${dest}" "${url}"`, {
       stdio: 'inherit',
@@ -114,19 +155,16 @@ function downloadWithCurl(url, dest, filename) {
       throw new Error(`File too small: ${(stats.size / 1024).toFixed(2)} KB`);
     }
     
-    console.log(`[✓] ${filename} downloaded successfully (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-    completed++;
-    if (completed + failed === files.length) {
-      printSummary();
-    }
+    console.log(`[✓] ${filename} downloaded successfully (${(stats.size / 1024 / 1024).toFixed(2)} MB)\n`);
+    return true;
   } catch (err) {
-    console.error(`[✗] ${filename} failed: ${err.message}`);
-    failed++;
-    if (completed + failed === files.length) {
-      printSummary();
-    }
+    console.error(`[✗] ${filename} attempt failed: ${err.message}`);
+    return false;
   }
 }
+
+// 开始下载
+processDownloadQueue();
 
 function printSummary() {
   console.log('\n========================================');
