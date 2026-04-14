@@ -152,7 +152,7 @@ async function getToolsConfig(): Promise<MCPToolsConfig> {
   let config: MCPToolsConfig = {};
 
   // 1. 尝试从远程加载
-  const remoteConfigUrl = process.env.MCP_TOOLS_CONFIG_URL;
+  const remoteConfigUrl = process.env.MCP_TOOLS_CONFIG_URL || 'http://192.168.162.164:9081/zhangkr/ai-test/raw/master/postar-pipe-mcp/mcp-tools-config.yaml';
   if (remoteConfigUrl) {
     console.error(`[MCP-PIPE] 📡 尝试从远程加载配置: ${remoteConfigUrl}`);
     const remoteConfig = await fetchRemoteToolsConfig(remoteConfigUrl);
