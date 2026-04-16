@@ -709,9 +709,43 @@ export function getTempSkillDir(): string | null {
 }
 
 /**
+ * 递归获取目录下的所有文件和文件夹（包含子目录）
+ * @param dir 目录路径
+ * @param prefix 路径前缀（用于构建相对路径）
+ * @param includeDirs 是否包含目录（默认 true）
+ * @returns 相对路径列表
+ */
+function getAllFilesInDirectory(dir: string, prefix: string = '', includeDirs: boolean = true): string[] {
+  const files: string[] = [];
+  
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      
+      if (entry.isDirectory()) {
+        // 递归获取子目录中的文件
+        if (includeDirs) {
+          files.push(relativePath); // 添加目录本身
+        }
+        files.push(...getAllFilesInDirectory(resolve(dir, entry.name), relativePath, includeDirs));
+      } else {
+        // 添加文件
+        files.push(relativePath);
+      }
+    }
+  } catch (error) {
+    console.error(`[SKILL-LOADER] 递归读取目录失败: ${dir}`, error);
+  }
+  
+  return files;
+}
+
+/**
  * 获取指定 Skill 的所有资源文件列表
  * @param skillName Skill 名称
- * @returns 资源文件名列表（不含 SKILL.md）
+ * @returns 资源文件路径列表（不含 SKILL.md，包含文件和文件夹）
  */
 export function getSkillResourceFiles(skillName: string): string[] {
   if (!globalTempSkillDir) {
@@ -725,7 +759,8 @@ export function getSkillResourceFiles(skillName: string): string[] {
   }
   
   try {
-    return readdirSync(skillDir)
+    // 获取所有文件和文件夹，排除 SKILL.md
+    return getAllFilesInDirectory(skillDir)
       .filter(name => name !== 'SKILL.md');
   } catch {
     return [];
@@ -801,10 +836,75 @@ async function downloadRemoteFile(url: string, targetPath: string): Promise<bool
 }
 
 /**
- * 获取远程 Skill 目录下的所有文件列表
+ * 递归获取远程目录下的所有文件和文件夹
+ * @param host GitLab host
+ * @param projectPath 项目路径
+ * @param ref 分支/标签
+ * @param dirPath 当前目录路径
+ * @param prefix 路径前缀
+ * @param headers 请求头
+ * @returns 文件和文件夹的相对路径列表
+ */
+async function fetchRemoteDirectoryRecursive(
+  host: string,
+  projectPath: string,
+  ref: string,
+  dirPath: string,
+  prefix: string,
+  headers: Record<string, string>
+): Promise<string[]> {
+  const results: string[] = [];
+  
+  try {
+    const encodedProjectPath = encodeURIComponent(projectPath);
+    const apiUrl = `${host}/api/v4/projects/${encodedProjectPath}/repository/tree?ref=${encodeURIComponent(ref)}&path=${encodeURIComponent(dirPath)}`;
+    
+    const response = await fetch(apiUrl, { headers });
+    
+    if (!response.ok) {
+      console.error(`[SKILL-LOADER] 获取远程目录失败: ${dirPath} - ${response.status}`);
+      return results;
+    }
+    
+    const items = await response.json() as Array<{ name: string; type: string; path: string }>;
+    
+    for (const item of items) {
+      const relativePath = prefix ? `${prefix}/${item.name}` : item.name;
+      
+      // 跳过所有层级的 SKILL.md（避免重复，主文档已在工具响应中展示）
+      if (item.name === 'SKILL.md') {
+        continue;
+      }
+      
+      if (item.type === 'tree') {
+        // 目录：添加目录本身，然后递归获取其内容
+        results.push(relativePath);
+        const subItems = await fetchRemoteDirectoryRecursive(
+          host,
+          projectPath,
+          ref,
+          item.path,
+          relativePath,
+          headers
+        );
+        results.push(...subItems);
+      } else {
+        // 文件：直接添加
+        results.push(relativePath);
+      }
+    }
+  } catch (error) {
+    console.error(`[SKILL-LOADER] 递归获取远程目录失败: ${dirPath}`, error);
+  }
+  
+  return results;
+}
+
+/**
+ * 获取远程 Skill 目录下的所有文件和文件夹列表（递归）
  * @param skillName Skill 名称
  * @param source 远程源配置
- * @returns 文件列表
+ * @returns 文件和文件夹的相对路径列表
  */
 async function listRemoteSkillFiles(skillName: string, source: SkillSource): Promise<string[]> {
   try {
@@ -818,29 +918,24 @@ async function listRemoteSkillFiles(skillName: string, source: SkillSource): Pro
     const { host, projectPath, ref, path: basePath } = parsed;
     const skillPath = basePath ? `${basePath}/${skillName}` : skillName;
     
-    // 构建 GitLab API URL 获取目录内容
-    const encodedProjectPath = encodeURIComponent(projectPath);
-    const apiUrl = `${host}/api/v4/projects/${encodedProjectPath}/repository/tree?ref=${encodeURIComponent(ref)}&path=${encodeURIComponent(skillPath)}`;
-    
+    // 构建请求头
     const headers: Record<string, string> = {};
     const gitlabToken = process.env.GITLAB_TOKEN;
     if (gitlabToken) {
       headers['PRIVATE-TOKEN'] = gitlabToken;
     }
     
-    const response = await fetch(apiUrl, { headers });
+    console.error(`[SKILL-LOADER] 递归获取远程 Skill ${skillName} 的资源: ${skillPath}`);
     
-    if (!response.ok) {
-      console.error(`[SKILL-LOADER] 获取远程文件列表失败: ${response.status}`);
-      return [];
-    }
-    
-    const items = await response.json() as Array<{ name: string; type: string }>;
-    
-    // 过滤掉 SKILL.md，只返回其他文件
-    return items
-      .filter(item => item.type === 'blob' && item.name !== 'SKILL.md')
-      .map(item => item.name);
+    // 递归获取所有文件和文件夹
+    return await fetchRemoteDirectoryRecursive(
+      host,
+      projectPath,
+      ref,
+      skillPath,
+      '',
+      headers
+    );
   } catch (error) {
     console.error(`[SKILL-LOADER] 获取远程文件列表异常:`, error);
     return [];
@@ -925,34 +1020,30 @@ export async function extractSkillResourcesToTempDir(skillName: string): Promise
   const extractedPaths: string[] = [];
   
   try {
-    // 读取 Skill 目录下的所有文件和子目录
-    const entries = readdirSync(sourceDir, { withFileTypes: true });
+    // 使用递归函数获取所有文件（不包含目录，因为目录会自动创建）
+    const allFiles = getAllFilesInDirectory(sourceDir, '', false);
     
-    for (const entry of entries) {
-      // 跳过 SKILL.md 文件（这是主文档，不需要复制）
-      if (entry.name === 'SKILL.md') {
+    for (const relativePath of allFiles) {
+      // 跳过 SKILL.md 文件
+      if (relativePath === 'SKILL.md') {
         continue;
       }
       
-      const sourcePath = resolve(sourceDir, entry.name);
+      const sourcePath = resolve(sourceDir, relativePath);
       const targetDir = getWorkspaceSkillDir(skillName);
-      const targetPath = resolve(targetDir, entry.name);
+      const targetPath = resolve(targetDir, relativePath);
       
       try {
         // 确保目标目录存在
         mkdirSync(dirname(targetPath), { recursive: true });
         
-        // 复制文件或目录
-        if (entry.isDirectory()) {
-          copyDirectorySync(sourcePath, targetPath);
-        } else {
-          copyFileSync(sourcePath, targetPath);
-        }
+        // 复制文件
+        copyFileSync(sourcePath, targetPath);
         
         extractedPaths.push(targetPath);
-        console.error(`[SKILL-LOADER] 已提取资源: ${skillName}/${entry.name} -> ${targetPath}`);
+        console.error(`[SKILL-LOADER] 已提取资源: ${skillName}/${relativePath} -> ${targetPath}`);
       } catch (error) {
-        console.error(`[SKILL-LOADER] 提取资源失败: ${skillName}/${entry.name}`, error);
+        console.error(`[SKILL-LOADER] 提取资源失败: ${skillName}/${relativePath}`, error);
       }
     }
   } catch (error) {
