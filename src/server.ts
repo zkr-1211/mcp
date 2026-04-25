@@ -30,9 +30,9 @@ async function createServer(): Promise<McpServer> {
     server.registerTool(
       `${metadata.name}`,
       {
-        description: metadata.description,
+        description: `${metadata.description}\n\n📌 重要: 执行本工具后会列出所有可用资源文件的完整路径。Skill 文档中提到的任何文件操作(读取/打开/查看/加载等),都应使用这些提供的路径。`,
         inputSchema: {
-          trigger: z.string().optional().describe(`触发标识，如 "${metadata.name}"`),
+          trigger: z.string().optional().describe(`触发标识,如 "${metadata.name}"`),
         },
       },
       async ({ trigger }: { trigger?: string }) => {
@@ -59,7 +59,8 @@ async function createServer(): Promise<McpServer> {
           } else {
             resourceNotice += '>   （无额外资源文件）\n';
           }
-          resourceNotice += `> \n> 💡 **提示**: 当 Skill 文档中提到读取配置文件或模板文件时，请使用上述完整路径\n\n`;
+          resourceNotice += `> \n> 📌 **资源路径说明**: 以上列出的是本 Skill 的所有可用资源文件。\n`;
+          resourceNotice += `> 当 Skill 文档中涉及任何文件操作(读取、打开、查看、加载、引用等)时,请使用上述对应的完整路径,不要自行推测或使用其他路径。\n\n`;
           
           injectedContent = resourceNotice + skillContent;
         }
@@ -177,8 +178,10 @@ async function main(): Promise<void> {
   // 2. 预加载所有 skills（必须成功才能提供服务）
   await preloadSkills();
 
-  // 3. 将所有 Skill 资源提取到固定目录（初始化时注入）
+  // 3. 将所有 Skill 资源提取到固定目录(初始化时注入)
   await extractAllSkillResourcesToTempDir(skillResourcesDir);
+  console.error(`[MCP-PIPE] ✅ Skill 资源已提取到: ${skillResourcesDir}`);
+  console.error(`[MCP-PIPE] 💡 AI 执行 Skill 时会自动获取资源文件路径`);
 
   // 4. 初始化 MCP 客户端
   initMCPClients();
