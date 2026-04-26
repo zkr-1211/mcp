@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { initMCPClients } from './utils/mcp-registry.js';
 import { getProxiedTools, handleProxiedTool } from './utils/tool-proxy.js';
 import { getSkillContent, getAvailableSkills, getSkillMetadata, getAllSkillsMetadata, extractAllSkillResourcesToTempDir, getTempSkillDir, getSkillResourceFiles } from './utils/skill-loader.js';
+import { wordToMdTool } from './utils/word-to-md-tool.js';
 
 // 固定的 Skill 资源目录路径
 const FIXED_SKILL_DIR = join(tmpdir(), 'mcp-pipe-skills');
@@ -74,6 +75,18 @@ async function createServer(): Promise<McpServer> {
       }
     );
   }
+
+  // 注册 Word to Markdown 工具
+  server.registerTool(
+    wordToMdTool.name,
+    {
+      description: wordToMdTool.description,
+      inputSchema: wordToMdTool.inputSchema,
+    },
+    async (args: any) => {
+      return await wordToMdTool.handler(args);
+    }
+  );
 
   // 注册代理工具
   const proxiedTools = await getProxiedTools();

@@ -16,13 +16,14 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build && npm run copy:skills",
-    "build:tsc": "tsc && npm run copy:skills",
+    "build": "vite build && npm run copy:skills && npm run copy:scripts",
+    "build:tsc": "tsc && npm run copy:skills && npm run copy:scripts",
     "copy:skills": "cp -r src/skills dist/",
+    "copy:scripts": "cp -r src/scripts dist/",
     "dev": "vite",
     "start": "node dist/server.js",
     "postinstall": "node bin/install.js",
-    "pkg:build": "npm run build && npx @yao-pkg/pkg dist/server.js -t node24-macos-arm64 -o release/postar-pipe-mcp-macos-arm64 --compress Brotli --config package.json",
+    "pkg:build": "npm run build && npx @yao-pkg/pkg dist/server.js -t node24-macos-arm64 -o release/postar-pipe-mcp-macos-arm64 --config package.json",
     "pkg:update": "node -e \"import('./scripts/config.js').then(async c => { const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8')); pkg.pkg.targets = c.PKG_TARGETS; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n'); console.log('✅ package.json 已更新'); await import('./scripts/sync-build-yaml.js'); })\"",
     "release": "npm version patch && git push && git push --tags && npm run watch:release",
     "release:minor": "npm version minor && git push && git push --tags && npm run watch:release",
@@ -41,13 +42,17 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "fs-extra": "^11.2.0",
     "gitlab-core-mcp": "^6.62.2",
     "jenkins-mcp": "^0.2.1",
     "js-yaml": "^4.1.0",
+    "mammoth": "^1.8.0",
+    "turndown": "^7.1.2",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.5"
   },
   "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "@yao-pkg/pkg": "^6.14.2",
@@ -66,14 +71,21 @@
       "dist/**/*.js",
       "node_modules/@modelcontextprotocol/sdk/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.js",
-      "node_modules/jenkins-mcp/**/*.js"
+      "node_modules/jenkins-mcp/**/*.js",
+      "node_modules/mammoth/**/*.js",
+      "node_modules/turndown/**/*.js",
+      "node_modules/fs-extra/**/*.js"
     ],
     "assets": [
       "dist/skills/**/*",
+      "dist/scripts/**/*",
       "node_modules/gitlab-core-mcp/**/*.js",
       "node_modules/gitlab-core-mcp/**/*.json",
       "node_modules/jenkins-mcp/**/*.js",
-      "node_modules/jenkins-mcp/**/*.json"
+      "node_modules/jenkins-mcp/**/*.json",
+      "node_modules/mammoth/**/*.js",
+      "node_modules/turndown/**/*.js",
+      "node_modules/fs-extra/**/*.js"
     ],
     "targets": [
       "node24-macos-arm64",
