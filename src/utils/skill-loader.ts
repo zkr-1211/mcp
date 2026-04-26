@@ -275,6 +275,7 @@ function isCacheExpired(timestamp: number): boolean {
  * 优先从源配置的 skillsList 读取,否则从环境变量 SKILLS_LIST 读取
  * 如果都未配置则自动遍历所有远程目录
  * 支持 TTL 缓存,过期自动刷新
+ * 远程失败时自动降级到本地模式
  */
 async function fetchRemoteSkillsList(config: SkillsConfig): Promise<string[]> {
   // 检查缓存是否有效
@@ -283,6 +284,12 @@ async function fetchRemoteSkillsList(config: SkillsConfig): Promise<string[]> {
   }
 
   console.error(`[SKILL-LOADER] Skills 列表缓存过期或不存在,重新加载...`);
+
+  // 如果设置为本地模式,直接使用本地 Skills
+  if (process.env.SKILLS_SOURCE === 'local') {
+    console.error(`[SKILL-LOADER] 使用本地模式`);
+    return loadLocalSkillsList();
+  }
 
   const skillsListEnv = process.env.SKILLS_LIST;
 
@@ -298,21 +305,14 @@ async function fetchRemoteSkillsList(config: SkillsConfig): Promise<string[]> {
     return skills;
   }
 
-  // 未配置 SKILLS_LIST,检查各源是否有独立的 skillsList
-  console.error(`[SKILL-LOADER] 未配置 SKILLS_LIST,检查各源独立配置...`);
-
-  const allSkills: string[] = [];
-  skillSourceMap.clear();
-
+  // 尝试从远程加载,失败自动降级到本地
   if (config.sources && config.sources.length > 0) {
-    // 多源模式:遍历所有源
+    // 多源模式:遍历所有源,汇总 skills
+    const allSkills: string[] = [];
     for (const source of config.sources) {
-      console.error(`[SKILL-LOADER] 扫描源: ${source.name} (${source.originalUrl})`);
-
+      // 优先使用源的 skillsList 配置（从 ?skills= 参数解析）
       if (source.skillsList && source.skillsList.length > 0) {
-        // 该源有独立的 skills 列表配置
-        console.error(`[SKILL-LOADER] 源 ${source.name} 使用独立 skills 列表: ${source.skillsList.join(', ')}`);
-        
+        console.error(`[SKILL-LOADER] 源 ${source.name} 使用 skills 参数: ${source.skillsList.join(', ')}`);
         for (const skillName of source.skillsList) {
           if (!allSkills.includes(skillName)) {
             allSkills.push(skillName);
@@ -320,42 +320,61 @@ async function fetchRemoteSkillsList(config: SkillsConfig): Promise<string[]> {
           skillSourceMap.set(skillName, source);
         }
       } else {
-        // 该源没有独立配置,自动遍历目录
-        console.error(`[SKILL-LOADER] 源 ${source.name} 未配置独立 skills,自动遍历目录...`);
+        // 没有 skills 参数,自动遍历目录
         const sourceConfig: SkillsConfig = {
           source: 'remote',
           baseUrl: source.baseUrl,
           originalUrl: source.originalUrl,
         };
-
         const skills = await fetchRemoteSkillsFromDirectory(sourceConfig);
-        console.error(`[SKILL-LOADER] 源 ${source.name} 发现 skills: ${skills.join(', ')}`);
-
-        // 记录每个 skill 的来源,后加载的 skill 会覆盖先加载的(优先级)
-        for (const skillName of skills) {
-          if (!allSkills.includes(skillName)) {
-            allSkills.push(skillName);
+        for (const skill of skills) {
+          if (!allSkills.includes(skill)) {
+            allSkills.push(skill);
           }
-          skillSourceMap.set(skillName, source);
         }
       }
     }
-  } else if (config.baseUrl && config.originalUrl) {
-    // 单源模式(兼容旧代码)
+    if (allSkills.length > 0) {
+      remoteSkillsList = { data: allSkills, timestamp: Date.now() };
+      return allSkills;
+    }
+  } else if (config.baseUrl) {
     const skills = await fetchRemoteSkillsFromDirectory(config);
-    for (const skillName of skills) {
-      allSkills.push(skillName);
-      skillSourceMap.set(skillName, {
-        name: 'default',
-        baseUrl: config.baseUrl,
-        originalUrl: config.originalUrl,
-      });
+    if (skills.length > 0) {
+      remoteSkillsList = { data: skills, timestamp: Date.now() };
+      return skills;
     }
   }
+  
+  // 远程失败,使用本地
+  return loadLocalSkillsList();
+}
 
-  console.error(`[SKILL-LOADER] 汇总所有 skills: ${allSkills.join(', ')}`);
-  remoteSkillsList = { data: allSkills, timestamp: Date.now() };
-  return allSkills;
+/**
+ * 未配置 SKILLS_LIST,检查各源是否有独立的 skillsList
+ */
+/**
+ * 加载本地 Skills 列表(降级模式)
+ */
+function loadLocalSkillsList(): string[] {
+  try {
+    const skillsDir = getSkillsDir();
+    
+    if (!existsSync(skillsDir)) {
+      console.error(`[SKILL-LOADER] ⚠️ 本地 Skills 目录也不存在: ${skillsDir}`);
+      return [];
+    }
+
+    const localSkills = readdirSync(skillsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+    
+    console.error(`[SKILL-LOADER] ✅ 本地内置 Skills: ${localSkills.join(', ')}`);
+    return localSkills;
+  } catch (error: any) {
+    console.error(`[SKILL-LOADER] ⚠️ 加载本地 Skills 失败: ${error.message}`);
+    return [];
+  }
 }
 
 /**
@@ -503,6 +522,11 @@ function loadLocalSkillContent(skillName: string): string {
  * 远程失败时自动降级到本地
  */
 async function loadSkillContent(skillName: string): Promise<string> {
+  // 如果是本地模式,直接使用本地
+  if (process.env.SKILLS_SOURCE === 'local') {
+    return loadLocalSkillContent(skillName);
+  }
+
   const config = getSkillsConfig();
 
   if (config.source === 'remote') {
@@ -983,13 +1007,19 @@ async function extractRemoteSkillResourcesToTempDir(skillName: string, source: S
  * 提取 Skill 的所有资源到临时目录（用于初始化时注入）
  * 自动扫描 Skill 目录下的所有文件（除了 SKILL.md），无需 frontmatter 声明
  * 支持本地和远程 Skill
+ * 如果 GitLab 未连接,自动降级到本地模式
  * @param skillName Skill 名称
  * @returns 提取的资源路径列表
  */
 export async function extractSkillResourcesToTempDir(skillName: string): Promise<string[]> {
+  // 如果是本地模式,直接使用本地资源
+  if (process.env.SKILLS_SOURCE === 'local') {
+    return extractLocalSkillResources(skillName);
+  }
+
   const config = getSkillsConfig();
   
-  // 如果是远程模式，从远程下载资源
+  // 远程模式
   if (config.source === 'remote') {
     const source = skillSourceMap.get(skillName);
     if (source) {
@@ -1008,6 +1038,13 @@ export async function extractSkillResourcesToTempDir(skillName: string): Promise
   }
   
   // 本地模式：从本地文件系统复制
+  return extractLocalSkillResources(skillName);
+}
+
+/**
+ * 从本地提取 Skill 资源
+ */
+function extractLocalSkillResources(skillName: string): string[] {
   const skillDir = getSkillsDir();
   const sourceDir = resolve(skillDir, skillName);
   
@@ -1041,7 +1078,7 @@ export async function extractSkillResourcesToTempDir(skillName: string): Promise
         copyFileSync(sourcePath, targetPath);
         
         extractedPaths.push(targetPath);
-        console.error(`[SKILL-LOADER] 已提取资源: ${skillName}/${relativePath} -> ${targetPath}`);
+        console.error(`[SKILL-LOADER] 已提取本地资源: ${skillName}/${relativePath} -> ${targetPath}`);
       } catch (error) {
         console.error(`[SKILL-LOADER] 提取资源失败: ${skillName}/${relativePath}`, error);
       }

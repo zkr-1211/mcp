@@ -31,7 +31,7 @@ async function createServer(): Promise<McpServer> {
     server.registerTool(
       `${metadata.name}`,
       {
-        description: `${metadata.description}\n\n📌 重要: 执行本工具后会列出所有可用资源文件的完整路径。Skill 文档中提到的任何文件操作(读取/打开/查看/加载等),都应使用这些提供的路径。`,
+        description: `${metadata.description}`,
         inputSchema: {
           trigger: z.string().optional().describe(`触发标识,如 "${metadata.name}"`),
         },
@@ -51,7 +51,7 @@ async function createServer(): Promise<McpServer> {
           const resourceFiles = getSkillResourceFiles(metadata.name);
           
           // 在 Skill 内容开头插入资源目录提示（让 AI 第一时间知道去哪找文件）
-          let resourceNotice = `> 📁 **本 Skill 的资源文件**:\n`;
+          let resourceNotice = `> 📁重要必读 **本 Skill 的资源文件、提到的任何文件操作(读取/打开/查看/加载等),都应使用这些提供的路径**:\n`;
           
           if (resourceFiles.length > 0) {
             for (const file of resourceFiles) {
@@ -182,6 +182,37 @@ async function main(): Promise<void> {
     process.exit(0);
   });
 
+  // 0. 快速测试 GitLab 连接(5秒超时)
+  const gitlabUrl = process.env.GITLAB_URL || 'http://192.168.162.164:9081';
+  console.error(`[MCP-PIPE] 测试 GitLab 连接: ${gitlabUrl}`);
+  
+  let gitlabConnected = false;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(`${gitlabUrl}/api/v4/version`, {
+      signal: controller.signal,
+      headers: {
+        'PRIVATE-TOKEN': process.env.GITLAB_TOKEN || '',
+      }
+    });
+    clearTimeout(timeoutId);
+    
+    gitlabConnected = response.ok;
+  } catch {
+    gitlabConnected = false;
+  }
+  
+  if (!gitlabConnected) {
+    console.error(`[MCP-PIPE] ⚠️ GitLab 无法连接,使用本地模式 (连上 VPN 后重启即可)`);
+    // 设置环境变量,让后续代码跳过远程操作
+    process.env.SKILLS_SOURCE = 'local';
+    process.env.MCP_TOOLS_SOURCE = 'local';
+  } else {
+    console.error(`[MCP-PIPE] ✅ GitLab 连接成功`);
+  }
+
   // 1. 创建固定的 Skill 资源目录
   if (!existsSync(skillResourcesDir)) {
     mkdirSync(skillResourcesDir, { recursive: true });
@@ -196,8 +227,8 @@ async function main(): Promise<void> {
   console.error(`[MCP-PIPE] ✅ Skill 资源已提取到: ${skillResourcesDir}`);
   console.error(`[MCP-PIPE] 💡 AI 执行 Skill 时会自动获取资源文件路径`);
 
-  // 4. 初始化 MCP 客户端
-  initMCPClients();
+  // 4. 初始化 MCP 客户端(会测试连接)
+  await initMCPClients();
 
   // 5. 创建并启动 Server
   const server = await createServer();

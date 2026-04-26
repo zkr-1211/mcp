@@ -33,7 +33,7 @@ function parseJenkinsInstances(): JenkinsInstance[] {
   const defaultToken = process.env.JENKINS_TOKEN;
 
   // 只有用户名和 token 都配置了才注册
-  if (defaultUser && defaultToken) {
+  if (defaultUser && defaultToken && defaultUrl) {
     instances.push({
       name: 'jenkins',
       url: defaultUrl,
@@ -92,44 +92,58 @@ function getPackageEntry(packageName: string): string | null {
 
 /**
  * 注册 GitLab MCP
+ * 先测试连接,连不上则跳过注册
  */
-function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): void {
-  // 如果外部没有配置，使用默认值
+async function registerGitLab(manager: ReturnType<typeof getMCPClientManager>): Promise<void> {
   const gitlabToken = process.env.GITLAB_TOKEN;
   const gitlabUrl = process.env.GITLAB_URL || 'http://192.168.162.164:9081';
 
-  if (gitlabToken) {
-    const nodePath = process.execPath;
-    const gitlabPath = getPackageEntry('gitlab-core-mcp');
-
-    if (!gitlabPath) {
-      console.error('[MCP-PIPE] 警告：gitlab-core-mcp 未安装，GitLab 功能不可用');
-      return;
-    }
-
-    manager.registerConfig('gitlab', {
-      name: 'gitlab',
-      command: nodePath,
-      args: [gitlabPath],
-      env: {
-        GITLAB_API_URL: gitlabUrl,
-        GITLAB_TOKEN: gitlabToken,
-      },
-    });
-    console.error(`[MCP-PIPE] GitLab MCP 已注册 (${gitlabUrl})`);
-  } else {
-    console.error('[MCP-PIPE] 警告：GITLAB_TOKEN 未设置，GitLab 功能不可用');
+  // 如果设置为本地模式,跳过注册
+  if (process.env.MCP_TOOLS_SOURCE === 'local') {
+    console.error(`[MCP-PIPE] 本地模式,跳过 GitLab 注册`);
+    return;
   }
+
+  if (!gitlabToken) {
+    console.error('[MCP-PIPE] 警告:GITLAB_TOKEN 未设置,跳过 GitLab 注册');
+    return;
+  }
+  
+  const nodePath = process.execPath;
+  const gitlabPath = getPackageEntry('gitlab-core-mcp');
+
+  if (!gitlabPath) {
+    console.error('[MCP-PIPE] 警告:gitlab-core-mcp 未安装,gitlab 功能不可用');
+    return;
+  }
+
+  manager.registerConfig('gitlab', {
+    name: 'gitlab',
+    command: nodePath,
+    args: [gitlabPath],
+    env: {
+      GITLAB_API_URL: gitlabUrl,
+      GITLAB_TOKEN: gitlabToken,
+    },
+  });
+  console.error(`[MCP-PIPE] GitLab MCP 已注册 (${gitlabUrl})`);
 }
 
 /**
  * 注册 Jenkins MCP 实例
+ * 先测试连接,连不上则跳过该实例注册
  */
-function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager>): void {
+async function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager>): Promise<void> {
+  // 如果设置为本地模式,跳过注册
+  if (process.env.MCP_TOOLS_SOURCE === 'local') {
+    console.error(`[MCP-PIPE] 本地模式,跳过 Jenkins 注册`);
+    return;
+  }
+
   const instances = parseJenkinsInstances();
 
   if (instances.length === 0) {
-    console.error('[MCP-PIPE] 警告：未检测到任何 Jenkins 配置');
+    console.error('[MCP-PIPE] 警告:未检测到任何 Jenkins 配置');
     return;
   }
 
@@ -137,7 +151,7 @@ function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager
   const jenkinsPath = getPackageEntry('jenkins-mcp');
 
   if (!jenkinsPath) {
-    console.error('[MCP-PIPE] 警告：jenkins-mcp 未安装，Jenkins 功能不可用');
+    console.error('[MCP-PIPE] 警告:jenkins-mcp 未安装,Jenkins 功能不可用');
     return;
   }
 
@@ -161,10 +175,11 @@ function registerJenkinsInstances(manager: ReturnType<typeof getMCPClientManager
 
 /**
  * 初始化所有 MCP 客户端
+ * 异步测试连接后再注册,避免无法连接的服务阻塞启动
  */
-export function initMCPClients(): void {
+export async function initMCPClients(): Promise<void> {
   const manager = getMCPClientManager();
 
-  registerGitLab(manager);
-  registerJenkinsInstances(manager);
+  await registerGitLab(manager);
+  await registerJenkinsInstances(manager);
 }
