@@ -26,16 +26,16 @@ export const wordToMdTool = {
   inputSchema: {
     inputPath: z.string().describe('Word 文档的绝对路径(.docx 格式)'),
     outputDir: z.string().optional().describe('输出目录的绝对路径(可选,默认使用当前工作目录下的 docs/md/)'),
-    splitLevel: z.number().optional().describe('按标题级别拆分(例如:2 表示按 ## 拆分),0 表示不拆分'),
+    splitLevel: z.number().optional().describe('按标题级别拆分(例如:2 表示按 ## 拆分),0 表示不拆分,默认值为 2'),
     modules: z.string().optional().describe('只输出指定模块,逗号分隔(例如:"5.1,5.2")'),
-    imagesInModule: z.boolean().optional().describe('将图片放在各模块文件夹内,而非全局 assets/ 目录'),
+    imagesInModule: z.boolean().optional().describe('将图片放在各模块文件夹内,而非全局 assets/ 目录,默认值为 true'),
   },
   handler: async ({ 
     inputPath, 
     outputDir,
-    splitLevel = 0, 
+    splitLevel = 2, 
     modules, 
-    imagesInModule = false 
+    imagesInModule = true 
   }: { 
     inputPath: string; 
     outputDir?: string;
@@ -97,7 +97,7 @@ export const wordToMdTool = {
                 `📋 转换参数:\n` +
                 `- 拆分级别: ${splitLevel > 0 ? `H${splitLevel}` : '不拆分'}\n` +
                 `- 模块过滤: ${modulesArray ? modulesArray.join(', ') : '无'}\n` +
-                `- 图片位置: ${imagesInModule ? '各模块内' : '全局 assets/'}\n\n` +
+                `- 图片位置: ${imagesInModule ? '各模块内(默认)' : '全局 assets/'}\n\n` +
                 `💡 提示: 转换后的文件已保存到输出目录,包含 index.md(目录索引)和 summary.json(摘要信息)`,
         }],
       };
