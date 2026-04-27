@@ -11,6 +11,7 @@ import { initMCPClients } from './utils/mcp-registry.js';
 import { getProxiedTools, handleProxiedTool } from './utils/tool-proxy.js';
 import { getSkillContent, getAvailableSkills, getSkillMetadata, getAllSkillsMetadata, extractAllSkillResourcesToTempDir, getTempSkillDir, getSkillResourceFiles } from './utils/skill-loader.js';
 import { wordToMdTool } from './utils/word-to-md-tool.js';
+import { executeBatch, formatBatchResults } from './utils/batch-executor.js';
 
 // 固定的 Skill 资源目录路径
 const FIXED_SKILL_DIR = join(tmpdir(), 'mcp-pipe-skills');
@@ -85,6 +86,35 @@ async function createServer(): Promise<McpServer> {
     },
     async (args: any) => {
       return await wordToMdTool.handler(args);
+    }
+  );
+
+  // 注册批量执行工具
+  server.registerTool(
+    'batch_execute',
+    {
+      description: '批量执行多个MCP工具调用，支持组内并行。一次调用完成多步骤操作，减少AI与MCP之间的往返次数。适用于CI/CD流水线、多环境查询、批量操作等场景。',
+      inputSchema: {
+        steps: z.array(z.object({
+          tool: z.string().describe('工具名称'),
+          args: z.record(z.any()).optional().describe('工具参数（可选）'),
+          parallel_group: z.number().optional().default(0).describe('并行分组编号，同组步骤并发执行，不同组按组号升序顺序执行，默认 0'),
+        })).describe('要执行的工具调用列表'),
+      },
+    },
+    async ({ steps }: { steps: Array<{ tool: string; args?: Record<string, any>; parallel_group?: number }> }) => {
+      try {
+        const results = await executeBatch(steps);
+        const formatted = formatBatchResults(results);
+        return {
+          content: [{ type: 'text' as const, text: formatted }],
+        };
+      } catch (error: any) {
+        return {
+          content: [{ type: 'text' as const, text: `Batch Execute 执行失败: ${error.message}` }],
+          isError: true,
+        };
+      }
     }
   );
 

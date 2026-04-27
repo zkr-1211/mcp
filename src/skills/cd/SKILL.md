@@ -267,11 +267,11 @@ version: 1.0.1
 
 | 项目 | 值 |
 |------|-----|
+| 构建链接 | [点击查看构建进度]({build_url}) |
 | 项目名称 | {project_name} |
 | 部署分支 | {branch} |
 | 目标环境 | {env} |
 | 队列 ID | {queue_id} |
-| 构建链接 | [点击查看构建进度]({build_url}) |
 ```
 
 **多环境批量部署成功** 输出：
@@ -280,11 +280,11 @@ version: 1.0.1
 
 📋 部署信息汇总：
 
-| 环境 | 项目名称 | 队列 ID | 构建链接 |
-|------|----------|---------|----------|
-| ✅ {env_1} | {project_name_1} | {queue_id_1} | [点击查看构建]({build_url_1}) |
-| ✅ {env_2} | {project_name_2} | {queue_id_2} | [点击查看构建]({build_url_2}) |
-| ✅ {env_3} | {project_name_3} | {queue_id_3} | [点击查看构建]({build_url_3}) |
+| 构建链接 | 环境 | 项目名称 | 队列 ID |
+|----------|------|----------|---------|
+| [点击查看构建]({build_url_1}) | ✅ {env_1} | {project_name_1} | {queue_id_1} |
+| [点击查看构建]({build_url_2}) | ✅ {env_2} | {project_name_2} | {queue_id_2} |
+| [点击查看构建]({build_url_3}) | ✅ {env_3} | {project_name_3} | {queue_id_3} |
 
 **分支策略**：使用 Jenkins Job 固定分支 / {branch}
 ```

@@ -125,10 +125,10 @@ steps:
           source_branch: "{source_branch}"
           target_branch: "{target_branch}"
           merge_when_pipeline_succeeds: true
-        critical_note: "merge_when_pipeline_succeeds 必须设置为 true,严禁设置为 false"
+        critical_note: "merge_when_pipeline_succeeds 必须设置为布尔值 true,严禁设置为字符串 \"true\" 或 false"
         merge_when_pipeline_succeeds_behavior:
-          true: "允许 GitLab 在流水线通过后自动合并(即使没有流水线也会立即合并)"
-          false: "可能导致合并失败,GitLab 会拒绝执行合并操作"
+          "true (boolean)": "允许 GitLab 在流水线通过后自动合并(即使没有流水线也会立即合并)"
+          "false (boolean) 或 \"true\" (string)": "可能导致合并失败,GitLab 会拒绝执行合并操作"
         error_handling:
           condition: "合并失败(如 405 错误)"
           action: "立即停止执行"
@@ -352,8 +352,8 @@ steps:
           - "source_branch"
           - "target_branch"
           - "merge_request_iid (string)"
-          - "merge_when_pipeline_succeeds (必须为 true)"
-        critical_constraint: "merge_when_pipeline_succeeds 必须为 true,设置为 false 会导致合并失败"
+          - "merge_when_pipeline_succeeds (必须为布尔值 true,不能是字符串)"
+        critical_constraint: "merge_when_pipeline_succeeds 必须为布尔值 true,设置为 false 或字符串 \"true\" 会导致合并失败"
         error_handling:
           condition: "合并失败(405 错误)"
           description: "可能是 MR 已合并或状态异常,检查 MR 状态"
@@ -382,10 +382,10 @@ steps:
         📋 合并汇总:
         | 项目 | 值 |
         |------|-----|
+        | MR 链接 | [点击查看 MR]({url}) |
         | 源分支 | {SOURCE_BRANCH} |
         | 目标分支 | {TARGET_BRANCH} |
         | MR 状态 | ✅ merged |
-        | MR 链接 | [点击查看 MR]({url}) |
 
         💡 如需部署,请执行:
         /cd {ENV}                    # 部署当前分支
@@ -474,10 +474,10 @@ steps:
 
         | 项目 | 值 |
         |------|-----|
+        | MR 链接 | [点击查看 MR]({url}) |
         | 源分支 | {SOURCE_BRANCH} |
         | 目标分支 | {TARGET_BRANCH} |
         | MR 状态 | ✅ merged |
-        | MR 链接 | [点击查看 MR]({url}) |
 
         💡 如需部署,请执行:
         /cd {ENV}                    # 部署当前分支
@@ -492,13 +492,13 @@ steps:
 
         | 项目 | 值 |
         |------|-----|
+        | MR 链接 | [点击查看 MR]({url}) |
         | 源分支 | {SOURCE_BRANCH} |
         | 目标分支 | {TARGET_BRANCH} |
         | MR 状态 | ✅ merged |
-        | MR 链接 | [点击查看 MR]({url}) |
 
         📋 部署汇总:
 
-        | 环境 | 队列 ID | 构建链接 |
-        |------|---------|----------|
-        | ✅ {ENV} | {queue_id} | [点击查看构建进度]({url}) |
+        | 构建链接 | 环境 | 队列 ID |
+        |----------|------|---------|
+        | [点击查看构建进度]({url}) | ✅ {ENV} | {queue_id} |

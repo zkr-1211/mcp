@@ -120,9 +120,9 @@ version: 1.0.0
 ### 3. MR 合并逻辑
 
 执行【合并 MR 工具】
-- **⚠️ 关键参数**：`merge_when_pipeline_succeeds` **必须设置为 `true`**，严禁设置为 `false`
-  - `true`：允许 GitLab 在流水线通过后自动合并（即使没有流水线也会立即合并）
-  - `false`：可能导致合并失败，GitLab 会拒绝执行合并操作
+- **⚠️ 关键参数**：`merge_when_pipeline_succeeds` **必须设置为布尔值 `true`**，严禁设置为字符串 `"true"` 或 `false`
+  - `true`（布尔值）：允许 GitLab 在流水线通过后自动合并（即使没有流水线也会立即合并）
+  - `false`（布尔值）或 `"true"`（字符串）：可能导致合并失败，GitLab 会拒绝执行合并操作
 - 如果失败（如 405 错误）：**立即停止执行**，输出：
   ```
   ❌ MR 合并失败：{error_message}
@@ -201,8 +201,8 @@ version: 1.0.0
 3. 执行【MR 状态检查逻辑】
 4. 执行【Review 检查逻辑】（如果启用 Review 模式）
 5. 执行【MR 合并逻辑】
-   - ⚠️ 必需参数：`source_branch`、`target_branch`、`merge_request_iid` (string)、`merge_when_pipeline_succeeds`
-   - ⚠️ 关键约束：`merge_when_pipeline_succeeds` **必须为 `true`**，设置为 `false` 会导致合并失败
+   - ⚠️ 必需参数：`source_branch`、`target_branch`、`merge_request_iid` (string)、`merge_when_pipeline_succeeds` (布尔值 true)
+   - ⚠️ 关键约束：`merge_when_pipeline_succeeds` **必须为布尔值 `true`**，设置为 `false` 或字符串 `"true"` 会导致合并失败
 
 ### 步骤 4: 验证与完成
 
@@ -358,7 +358,7 @@ version: 1.0.0
 - `merge_request_iid`: MR 内部 ID (string)
 - `source_branch`: 源分支名称（必需）
 - `target_branch`: 目标分支名称（必需）
-- `merge_when_pipeline_succeeds`: **true（必须）** ⚠️ 严禁设置为 false，否则会导致合并失败
+- `merge_when_pipeline_succeeds`: **true（布尔值，必须）** ⚠️ 严禁设置为 false 或字符串 "true"，否则会导致合并失败
 
 **关闭 MR**：
 - `action`: "update"
