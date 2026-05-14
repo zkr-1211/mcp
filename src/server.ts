@@ -70,7 +70,7 @@ async function createServer(): Promise<McpServer> {
         return {
           content: [{
             type: 'text' as const,
-            text: `🎯 [${metadata.name.toUpperCase()}_EXECUTE 已触发] 触发词: "${effectiveTrigger}"\n\n📖 ${skillMetadata.description}\n\n${injectedContent}\n\n---\n${skillLoaded ? '✅' : '❌'} Skills 加载状态: ${skillLoaded ? `${metadata.name} skill 已加载` : `${metadata.name} skill 未加载`}\n📦 已加载 Skills (${skills.length} 个): ${skills.join(', ') || '无'}`,
+            text: `🎯 [${metadata.name.toUpperCase()}_EXECUTE 已触发] 触发词: "${effectiveTrigger}"\n\n📖 ${skillMetadata.description}\n\n${injectedContent}\n\n---\n${skillLoaded ? '✅' : '❌'} Skills 加载状态: ${skillLoaded ? `${metadata.name} skill 已加载` : `${metadata.name} skill 未加载`}}`,
           }],
         };
       }
