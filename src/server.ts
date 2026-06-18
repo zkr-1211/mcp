@@ -89,6 +89,35 @@ async function createServer(): Promise<McpServer> {
     }
   );
 
+  // 注册环境配置获取工具
+  server.registerTool(
+    'get_env_config',
+    {
+      description: '获取当前 MCP 服务端的全部环境配置信息（GitLab、Jenkins、PIPE_TEMPLATE 等）。AI 可通过此工具一次性获取所有连接配置，无需逐个猜测环境变量。敏感 token 会做脱敏处理，仅展示前4位。',
+      inputSchema: {},
+    },
+    async () => {
+      const mask = (v?: string) => v ? v.slice(0, 4) + '****' : null;
+      const config = {
+        PIPE_TEMPLATE: process.env.PIPE_TEMPLATE || null,
+        GITLAB_URL: process.env.GITLAB_URL || null,
+        GITLAB_TOKEN: mask(process.env.GITLAB_TOKEN),
+        JENKINS_URL: process.env.JENKINS_URL || null,
+        JENKINS_USER: process.env.JENKINS_USER || null,
+        JENKINS_TOKEN: mask(process.env.JENKINS_TOKEN),
+        JENKINS_PROD_URL: process.env.JENKINS_PROD_URL || null,
+        JENKINS_PROD_USER: process.env.JENKINS_PROD_USER || null,
+        JENKINS_PROD_TOKEN: mask(process.env.JENKINS_PROD_TOKEN),
+      };
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify(config, null, 2),
+        }],
+      };
+    }
+  );
+
   // 注册批量执行工具
   server.registerTool(
     'batch_execute',
